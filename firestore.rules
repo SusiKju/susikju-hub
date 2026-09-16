@@ -1,0 +1,310 @@
+// ACHTUNG – bewusste Duplizierung, kein Tippfehler:
+// susikju-hub und tasks-extended teilen sich dasselbe Firebase-Projekt
+// (tasks-extended-34507), aber Firestore kennt nur EINE globale
+// firestore.rules pro Projekt – ein Deploy von hier ersetzt IMMER den
+// kompletten Regelsatz, nicht nur den susikju-hub-Teil. Matthias wollte die
+// beiden Repos nicht mischen (kein gemeinsamer Rules-Ordner, kein Deploy aus
+// tasks-extended für susikju-hub-Belange), deshalb liegt hier eine eigene,
+// vollständige Kopie inkl. aller Familien-Regeln aus tasks-extended.
+//
+// ponytail: Kopie statt geteilter Quelle – Drift-Risiko, wenn sich die
+// Familien-Regeln in tasks-extended ändern und hier nicht nachgezogen
+// werden (oder umgekehrt). Bei jeder Rules-Änderung in EINEM der beiden
+// Repos: Diff auch im anderen Repo nachziehen. Upgrade-Pfad, falls das
+// häufiger passiert: eigenes Firebase-Projekt nur für susikju-hub (dann
+// eigene, unabhängige Rules ohne Duplizierung, aber neue Google-UIDs statt
+// Wiederverwendung der tasks-extended-Konten).
+//
+// Stand der Familien-Regeln unten: siehe tasks-extended/firestore.rules,
+// Commit fe889b78 (2026-09-16).
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Hilfsfunktionen ────────────────────────────────────────────────────────
+
+    // Ist der anfragende User in dieser Familie Mitglied?
+    function isFamilyMember(familyId) {
+      return request.auth != null
+          && exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    // Ist der anfragende User ein Elternteil dieser Familie (nicht nur
+    // Mitglied)? role wird beim Anlegen des Mitglieds-Dokuments serverseitig
+    // aus childEmails abgeleitet und ist danach unveränderlich (siehe unten) –
+    // ein Kind kann sich also nicht selbst zum 'parent' machen.
+    function isParent(familyId) {
+      return isFamilyMember(familyId)
+          && get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'parent';
+    }
+
+    // Ist die eigene, per Google-Login verifizierte E-Mail als Kind-E-Mail
+    // dieser Familie hinterlegt (families/{familyId}/childEmails/{email})?
+    function isRegisteredChildEmail(familyId) {
+      return request.auth.token.email != null
+          && exists(/databases/$(database)/documents/families/$(familyId)/childEmails/$(request.auth.token.email.lower()));
+    }
+
+    // Ist der anfragende User eingeloggt?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ── userFamilies: schnelle Familien-Nachschlag pro User ────────────────────
+    // Nur der User selbst darf seinen eigenen Eintrag lesen/schreiben.
+    match /userFamilies/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── familyCodes: Beitrittscode-Lookup ─────────────────────────────────────
+    // Jeder eingeloggte User darf einen Code lesen (zum Beitreten).
+    // Erstellt wird der Code nur beim createFamily – kein direktes Schreiben durch User.
+    match /familyCodes/{code} {
+      // Einzelnen Code nachschlagen ja – ganze Tabelle auflisten nein (sonst
+      // kann jeder eingeloggte User alle familyId aller Familien einsammeln).
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Codes sind unveränderlich
+    }
+
+    // ── Familie (Hauptstruktur) ────────────────────────────────────────────────
+    match /families/{familyId} {
+
+      // Meta-Dokument: alle Mitglieder lesen, kein direktes Schreiben
+      allow read: if isFamilyMember(familyId);
+      allow create: if isSignedIn(); // createFamily schreibt das erste Mal
+      // TE-59: fuerUnsUids ist eine bewusst engere Allowlist als "alle
+      // Mitglieder" – nur wer selbst schon drinsteht, darf das Feld ändern
+      // (Annehmen einer Beitrittsanfrage mit Für-uns-Zugriff, oder späteres
+      // Verwalten in den Einstellungen). Alle anderen Felder bleiben für
+      // jedes Mitglied änderbar wie bisher.
+      allow update: if isFamilyMember(familyId)
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['fuerUnsUids'])
+            || request.auth.uid in resource.data.fuerUnsUids
+          );
+      allow delete: if false;
+
+      // Beitrittsanfragen (TE-59): ein Beitrittscode legt nur noch eine
+      // Anfrage an, kein Mitglieds-Dokument. Erst ein bestehendes Mitglied
+      // kann sie bestätigen (approved:true) – siehe members/create unten.
+      match /joinRequests/{uid} {
+        allow read: if isFamilyMember(familyId) || (isSignedIn() && request.auth.uid == uid);
+        // Anlegen ODER Zurücksetzen der eigenen Anfrage: requestToJoinFamily()
+        // schreibt per setDoc() auf einen festen Pfad (uid) – existiert schon
+        // ein (z.B. längst genehmigtes, aber nie abgeschlossenes) Dokument
+        // von einem früheren Versuch, zählt der erneute Schreibversuch für
+        // Firestore-Rules als "update", nicht "create". Ohne diese Zeile
+        // könnte sich niemand ohne bestehende Mitgliedschaft ein zweites Mal
+        // bewerben. In beiden Fällen muss der Inhalt wie eine frische,
+        // unbestätigte Anfrage aussehen – ein Antragsteller kann sich damit
+        // nicht selbst freischalten.
+        allow create, update: if isSignedIn() && request.auth.uid == uid
+            && request.resource.data.approved == false
+            && request.resource.data.joinCode is string
+            && get(/databases/$(database)/documents/familyCodes/$(request.resource.data.joinCode)).data.familyId == familyId;
+        // Bestätigen (approved:true setzen) darf nur ein Elternteil – Kinder
+        // dürfen keine neuen Mitglieder freischalten.
+        allow update: if isParent(familyId);
+        // Ablehnen/Aufräumen durch ein Mitglied, oder eigene Anfrage zurückziehen.
+        allow delete: if isFamilyMember(familyId) || (isSignedIn() && request.auth.uid == uid);
+      }
+
+      // Mitglieder-Liste
+      match /members/{uid} {
+        // Mitglieder lesen alle; User darf eigenes Dokument lesen (z.B. beim Beitreten prüfen)
+        allow read: if isFamilyMember(familyId) || (isSignedIn() && request.auth.uid == uid);
+        // Selbst-Eintrag erlaubt für:
+        //  a) den Familien-Gründer beim Anlegen (createFamily) – immer 'parent'.
+        //  b) einen bestätigten Beitritt (completeJoin) – NUR wenn die eigene
+        //     joinRequests/{uid} mit approved:true vorliegt. Ersetzt seit
+        //     TE-59 die reine joinCode-Prüfung: ein Code allein reicht nicht
+        //     mehr, ein bestehendes Mitglied muss aktiv zustimmen.
+        // In beiden Fällen wird `role` NICHT vom Client übernommen, sondern
+        // hier serverseitig gegen childEmails geprüft: nur wer mit einer als
+        // Kind hinterlegten E-Mail beitritt, darf 'child' eintragen; sonst
+        // ist ausschließlich 'parent' erlaubt. Ein manipulierter Client kann
+        // sich also nicht als 'parent' eintragen, indem er das Feld fälscht.
+        allow create: if isSignedIn() && request.auth.uid == uid
+            && (
+              (
+                get(/databases/$(database)/documents/families/$(familyId)).data.createdByUid == request.auth.uid
+                && request.resource.data.role == 'parent'
+              )
+              || (
+                get(/databases/$(database)/documents/families/$(familyId)/joinRequests/$(uid)).data.approved == true
+                && request.resource.data.role == (isRegisteredChildEmail(familyId) ? 'child' : 'parent')
+              )
+            );
+        allow delete: if isSignedIn() && request.auth.uid == uid;
+        // Eigenes Profil darf jeder aktualisieren, aber NICHT die eigene
+        // role/uid ändern (sonst könnte sich ein 'child'-Mitglied selbst zu
+        // 'parent' hochstufen).
+        allow update: if isSignedIn() && request.auth.uid == uid
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid']);
+        // Ein Elternteil darf jedes Mitglied bearbeiten, INKLUSIVE role –
+        // das ist der einzige Weg, eine falsch zugeordnete Rolle nachträglich
+        // zu korrigieren (z.B. ein Kind, das vor Einführung der Kind-E-Mail
+        // oder ohne hinterlegte E-Mail als 'parent' beigetreten ist), ohne
+        // dass das Mitglied die Familie verlassen und neu beitreten muss.
+        // uid bleibt auch hier unveränderlich (Dokument-Identität).
+        allow update: if isParent(familyId)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']);
+      }
+
+      // Kinder-Konfiguration (addChild, updateChild, deleteChild, Taschengeld).
+      // Lesen bleibt für alle Mitglieder offen (Kind sieht sein eigenes
+      // Profil), Ändern (u.a. Taschengeld, Login-E-Mail) nur für Eltern.
+      match /childrenConfig/{childId} {
+        allow read: if isFamilyMember(familyId);
+        allow write: if isParent(familyId);
+      }
+
+      // E-Mail → Kind-Zuordnung (siehe isRegisteredChildEmail). Nur Eltern
+      // legen fest, welche E-Mail beim Beitritt automatisch die
+      // eingeschränkte 'child'-Rolle bekommt.
+      match /childEmails/{email} {
+        // Auch ohne bestehende Mitgliedschaft lesbar für jemanden mit
+        // bestätigter Beitrittsanfrage – completeJoin() muss genau diesen
+        // Pfad VOR dem Anlegen des eigenen Mitglieds-Dokuments prüfen, um die
+        // korrekte role zu bestimmen. Ohne diese Ausnahme wäre das ein
+        // Henne-Ei-Problem: kein Mitglied → kein Lesen → keine Rolle bekannt.
+        allow read: if isFamilyMember(familyId)
+            || (isSignedIn()
+                && get(/databases/$(database)/documents/families/$(familyId)/joinRequests/$(request.auth.uid)).data.approved == true);
+        allow write: if isParent(familyId);
+      }
+
+      // Kinder-Aufgaben, Aktivitätslog, pushToken, Belohnung
+      match /children/{childId} {
+        allow read, write: if isFamilyMember(familyId);
+
+        match /tasks/{taskId} {
+          allow read, write: if isFamilyMember(familyId);
+        }
+
+        match /activity/{entryId} {
+          allow read, write: if isFamilyMember(familyId);
+        }
+      }
+
+      // Push-Trigger (Eltern → Kind)
+      match /pushTriggers/{childId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      // App-Konfiguration (Erinnerungszeiten)
+      match /config/{docId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      // Geteilte Notizliste (TE-59: von {document=**} auf den tatsächlich
+      // genutzten Pfad eingeschränkt – siehe Begründung bei "Für uns" unten.
+      // sharedNotes.ts schreibt ausschließlich unter shared/notepad/items/*.)
+      match /shared/notepad/items/{itemId} {
+        allow read, write: if isFamilyMember(familyId);
+      }
+
+      // "Für uns" (TE-59): eigene, engere Allowlist statt Familienmitgliedschaft.
+      // WICHTIG: Firestore kombiniert überlappende match-Blöcke mit ODER, nicht
+      // "spezifischster Pfad gewinnt" – ein zusätzlicher shared/{document=**}
+      // daneben hätte diese Regel wirkungslos gemacht (isFamilyMember allein
+      // hätte weiter gereicht, per Live-Test gegen die echten Prod-Rules
+      // bestätigt: Lenny konnte trotz dieser Regel lesen). Deshalb ist die
+      // shared-Notizen-Regel oben auf ihren echten Pfad eingeschränkt, damit
+      // hier NUR diese engere Regel greift.
+      match /shared/fuerUns/items/{itemId} {
+        allow read, write: if isFamilyMember(familyId)
+            && request.auth.uid in get(/databases/$(database)/documents/families/$(familyId)).data.fuerUnsUids;
+      }
+
+      // Countdown-Karten pro User (TE-171: vorher geteilt unter shared/countdowns)
+      match /countdownsByUser/{uid}/items/{itemId} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Persönlicher Scratchpad pro User
+      match /scratchpadByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // "Mein Tag"-Feed: manuelle Sortierung pro User
+      match /feedOrderByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // "Mein Tag"-Feed: per Long-Press hervorgehobenes Item pro User (TE-95)
+      match /feedHighlightByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // App-Settings pro User (TE-49)
+      match /settingsByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // E-Mail-Pins pro User (TE-50)
+      match /mailPinsByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Wichtig-Label der Tasks pro User (TE-123)
+      match /importantTasksByUser/{uid} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Persönliche Notizen pro User
+      match /personalNotesByUser/{uid}/notes/{noteId} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Persönliche Gedanken-Kacheln pro User
+      match /geistesKachelByUser/{uid}/tiles/{tileId} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Schnelle Notizen pro User (TE-148)
+      match /quickNotesByUser/{uid}/notes/{noteId} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+
+      // Persönliche Linkliste pro User (TE-32)
+      match /linksByUser/{uid}/links/{linkId} {
+        allow read, write: if isFamilyMember(familyId) && request.auth.uid == uid;
+      }
+    }
+
+    // ── Fokus-Kachel: strikt privat pro User, nicht geteilt (TE-7/TE-10/TE-12) ──
+    // Bewusst außerhalb von families/: keine Familienmitgliedschaft nötig,
+    // ausschließlich der Eigentümer (uid) darf lesen/schreiben.
+    match /focusTilesByUser/{uid}/themes/{theme} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── Bambini-Kinder-Registry: strikt privat pro User (TE-18) ───────────────
+    // Genau wie focusTilesByUser bewusst außerhalb von families/.
+    match /bambiniByUser/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── Artefakte: susikju-hub, eigenständige Freigabe pro Artefakt-Dokument
+    // über eine freie Personenliste (allowedUids), nicht über Familien-
+    // mitgliedschaft. Lesende Web-App fragt IMMER mit
+    // `where('allowedUids', 'array-contains', uid)`, sonst lehnt Firestore die
+    // List-Query grundsätzlich ab (Regeln allein filtern keine offenen Listen).
+    // Geschrieben wird ausschließlich serverseitig vom Export-/Sync-Skript
+    // (Service-Account, umgeht Rules) – daher hier bewusst kein Client-Write.
+    match /artefakte/{artefaktId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.allowedUids;
+      allow write: if false;
+    }
+
+    // ── Alle anderen Dokumente: kein Zugriff ──────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
