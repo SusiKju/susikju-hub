@@ -295,11 +295,15 @@ service cloud.firestore {
     // mitgliedschaft. Lesende Web-App fragt IMMER mit
     // `where('allowedUids', 'array-contains', uid)`, sonst lehnt Firestore die
     // List-Query grundsätzlich ab (Regeln allein filtern keine offenen Listen).
-    // Geschrieben wird ausschließlich serverseitig vom Export-/Sync-Skript
-    // (Service-Account, umgeht Rules) – daher hier bewusst kein Client-Write.
+    // Neu angelegt/importiert wird ausschließlich serverseitig vom Export-Skript
+    // (Service-Account, umgeht Rules ohnehin) – Freigegebene dürfen aber live in
+    // der App selbst schreiben (Lesestatus/Favorit toggeln, Status-Badge setzen),
+    // daher hier KEIN allow write:false mehr, nur die sensiblen Felder gesperrt.
     match /artefakte/{artefaktId} {
       allow read: if isSignedIn() && request.auth.uid in resource.data.allowedUids;
-      allow write: if false;
+      allow update: if isSignedIn() && request.auth.uid in resource.data.allowedUids
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['allowedUids', 'sourceUrl', 'slug']);
+      allow create, delete: if false;
     }
 
     // ── Alle anderen Dokumente: kein Zugriff ──────────────────────────────────
