@@ -21,7 +21,15 @@ Regeln für jeden Ordner:
 - Jeder Ordner braucht ein passendes Firestore-Dokument
   `artefakte/<slug>` mit mindestens: `slug`, `title`, `description`,
   `allowedUids` (Liste von Google-UIDs), `sourceUrl` (Original-Claude-
-  Artefakt-URL), `updatedAt`.
+  Artefakt-URL), `updatedAt`, `previewImage` (relativer Pfad zum
+  Vorschaubild, siehe unten), `status` (Freitext-Badge, siehe unten).
+- **Vorschaubild fürs Dashboard:** nach dem ersten Deploy die live-Seite per
+  Browser-Screenshot festhalten und als `artefakte/<slug>/preview.png`
+  committen; `previewImage` im Firestore-Dokument auf `<slug>/preview.png`
+  setzen. Ohne `previewImage` zeigt die Karte nur den Titel statt eines Bilds.
+- **Status-Badge:** Freitext, kein festes Enum. Wird direkt im Dashboard
+  gepflegt (Klick auf den Badge öffnet Auswahl bereits verwendeter Werte +
+  Freitextfeld) — der Export-Skill muss hier i.d.R. nichts setzen.
 
 Das Anlegen von Ordner + Firestore-Dokument übernimmt der Export-Skill
 (noch zu bauen) – siehe `.drills/2026-09-16/artefakt-app.md` in

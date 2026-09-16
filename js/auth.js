@@ -20,6 +20,7 @@ import {
   getDocs,
   query,
   where,
+  updateDoc,
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -58,4 +59,11 @@ export async function pruefeZugriff(artefaktId, uid) {
   const snap = await getDoc(doc(db, "artefakte", artefaktId));
   if (!snap.exists()) return false;
   return (snap.data().allowedUids ?? []).includes(uid);
+}
+
+// Status-Badge ist Freitext, pro Artefakt-Dokument gespeichert (kein festes
+// Enum) – die Rule erlaubt Freigegebenen das Schreiben, nur allowedUids/
+// sourceUrl/slug bleiben gesperrt (siehe firestore.rules).
+export async function setzeStatus(artefaktId, status) {
+  await updateDoc(doc(db, "artefakte", artefaktId), { status });
 }
