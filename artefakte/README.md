@@ -18,6 +18,16 @@ Regeln für jeden Ordner:
   dem zugehörigen Firestore-Dokument `artefakte/<slug>` geladen. Rein
   visuelle Artefakte ohne solche Daten können unverändert (1:1) übernommen
   werden.
+- **Wichtig beim Import/Update — ArtifactData nicht vergessen:** Der im
+  HTML sichtbare Datenstand ist nur der Stand zum letzten Publish-Zeitpunkt.
+  Laufende Änderungen (Status, Häkchen, Favoriten etc.) landen ausschließlich
+  in der Artefakt-eigenen `ArtifactData`-Datenbank, nicht im HTML. Vor dem
+  Zusammenbauen der Firestore-Nutzdaten IMMER zusätzlich mit dem
+  `ArtifactData`-Tool den aktuellen Stand der relevanten Collections lesen
+  und über die HTML-Default-Werte legen (Einträge aus der DB gewinnen).
+  Beim ersten Bücherwand-Export übersprungen: 38 von 88 Büchern hatten
+  dadurch einen veralteten Status in susikju-hub. Gilt auch bei jedem
+  späteren Update-Lauf desselben Artefakts, nicht nur beim Erstimport.
 - Jeder Ordner braucht ein passendes Firestore-Dokument
   `artefakte/<slug>` mit mindestens: `slug`, `title`, `description`,
   `allowedUids` (Liste von Google-UIDs), `sourceUrl` (Original-Claude-
@@ -32,6 +42,9 @@ Regeln für jeden Ordner:
   gepflegt (Klick auf den Badge öffnet Auswahl bereits verwendeter Werte +
   Freitextfeld) — der Export-Skill muss hier i.d.R. nichts setzen.
 
-Das Anlegen von Ordner + Firestore-Dokument übernimmt der Export-Skill
-(noch zu bauen) – siehe `.drills/2026-09-16/artefakt-app.md` in
-`tasks-extended` für die volle Design-Historie. Erster Testlauf: Bücherwand.
+Das Anlegen/Aktualisieren von Ordner + Firestore-Dokument übernimmt der
+Skill `artefakt-export` (in der Wissensdatenbank unter
+`.claude/skills/artefakt-export/SKILL.md`, auslösbar z. B. mit "übernimm
+dieses Artefakt in susikju-hub") – siehe `.drills/2026-09-16/artefakt-app.md`
+in `tasks-extended` für die volle Design-Historie. Erster Testlauf:
+Bücherwand.
