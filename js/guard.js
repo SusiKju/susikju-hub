@@ -5,9 +5,14 @@
 // öffentlich abrufbar, aber ohne Login+Freigabe liefert Firestore keine Daten
 // und die Seite leitet weiter, siehe Drill-Entscheidung "kein Public-Modus").
 //
-// Pfad zu ../../js/auth.js ist relativ zur Tiefe artefakte/<slug>/ – bei
-// tieferen Unterordnern in einem Artefakt entsprechend anpassen.
-import { onAuth, pruefeZugriff } from "../../js/auth.js";
+// ACHTUNG: der import-Pfad hier löst relativ zu guard.js SELBST auf (liegt
+// neben auth.js in js/), NICHT relativ zur einbindenden Seite – anders als
+// die window.location-Redirects unten, die relativ zur aufrufenden Seite
+// (artefakte/<slug>/) aufgelöst werden. Beides in einer Datei, leicht zu
+// verwechseln (hier ursprünglich falsch als "../../js/auth.js" geschrieben,
+// was den auth.js-Import von susikju.github.io/js/auth.js statt
+// susikju-hub/js/auth.js versuchte und mit 503 fehlschlug).
+import { onAuth, pruefeZugriff } from "./auth.js";
 
 export function schuetzeSeite(artefaktId) {
   return new Promise((resolve) => {
