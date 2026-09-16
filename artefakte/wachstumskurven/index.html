@@ -1,0 +1,504 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Wachstumskurven</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --page-bg:        #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --muted:          #898781;
+    --grid:           #e1e0d9;
+    --axis:           #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --shadow:         rgba(20,16,8,0.08);
+    --series-lenny:   #2a78d6;
+    --series-emil:    #eb6834;
+    --series-hannes:  #1baf7a;
+    --series-liddy:   #eda100;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page-bg:        #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted:          #898781;
+      --grid:           #2c2c2a;
+      --axis:           #383835;
+      --border:         rgba(255,255,255,0.10);
+      --shadow:         rgba(0,0,0,0.35);
+      --series-lenny:   #3987e5;
+      --series-emil:    #d95926;
+      --series-hannes:  #199e70;
+      --series-liddy:   #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg:        #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --muted:          #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255,255,255,0.10);
+    --shadow:         rgba(0,0,0,0.35);
+    --series-lenny:   #3987e5;
+    --series-emil:    #d95926;
+    --series-hannes:  #199e70;
+    --series-liddy:   #c98500;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-family: 'Work Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3rem) 1.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.25rem;
+  }
+
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header.hero .eyebrow {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  header.hero h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(1.9rem, 3.6vw, 2.6rem);
+    margin: 0;
+    text-wrap: balance;
+  }
+  header.hero p {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .stat-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.15rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .stat-card .kid {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 1.15rem;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .stat-card .figures { display: flex; gap: 1.4rem; }
+  .figure { display: flex; flex-direction: column; gap: .1rem; }
+  .figure .value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .figure .label {
+    font-size: .66rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+  .stat-card .note { font-size: .72rem; color: var(--muted); }
+
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    gap: 1.5rem;
+  }
+  .chart-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.3rem 1.4rem 1.1rem;
+  }
+  .chart-card h2 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 1.2rem;
+    margin: 0 0 .2rem;
+  }
+  .chart-card .chart-note {
+    margin: 0 0 .9rem;
+    font-size: .8rem;
+    color: var(--text-secondary);
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin-bottom: .7rem; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .78rem;
+    color: var(--text-secondary);
+  }
+  .chart-wrap { position: relative; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart-wrap text { font-family: 'Work Sans', sans-serif; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .55rem .7rem;
+    font-size: .76rem;
+    box-shadow: 0 10px 24px var(--shadow);
+    opacity: 0;
+    transition: opacity .08s ease;
+    min-width: 168px;
+    z-index: 5;
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip .age {
+    color: var(--muted);
+    font-size: .68rem;
+    margin-bottom: .35rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .tooltip .row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    justify-content: space-between;
+  }
+  .tooltip .row + .row { margin-top: .28rem; }
+  .tooltip .row .who { display: flex; align-items: center; gap: .4rem; }
+  .tooltip .row .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  details.rawdata { margin-top: .9rem; }
+  details.rawdata summary {
+    cursor: pointer;
+    font-size: .78rem;
+    color: var(--text-secondary);
+    user-select: none;
+  }
+  details.rawdata summary:focus-visible {
+    outline: 2px solid var(--series-lenny);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  .table-wrap {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: .65rem;
+    border-top: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  th, td {
+    padding: .35rem .5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid var(--border);
+  }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-1);
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: .64rem;
+    letter-spacing: .04em;
+  }
+
+  footer.source {
+    font-size: .76rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 1.25rem;
+  }
+</style>
+
+<div class="page">
+  <header class="hero">
+    <span class="eyebrow">Familie Redmann · privat</span>
+    <h1>Wie die Vier wachsen</h1>
+    <p>
+      Größe und Gewicht von Lenny, Emil, Hannes und Liddy im direkten Altersvergleich –
+      jede Linie endet ehrlich beim letzten tatsächlichen Messwert des jeweiligen Kindes.
+    </p>
+  </header>
+
+  <section class="stat-grid" id="stat-grid" aria-label="Aktuellster Messwert je Kind"></section>
+
+  <section class="charts">
+    <article class="chart-card">
+      <h2>Größe (cm)</h2>
+      <p class="chart-note">Alter in Jahren auf der x-Achse, proportional zur Zeit.</p>
+      <div class="legend" id="legend-height"></div>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-height" viewBox="0 0 680 380" role="img" aria-label="Größenverlauf der vier Kinder"></svg>
+        <div class="tooltip" id="tooltip-height"></div>
+      </div>
+      <details class="rawdata">
+        <summary>Rohdaten anzeigen</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kind</th><th>Alter (J.)</th><th>Größe (cm)</th></tr></thead>
+            <tbody id="table-height"></tbody>
+          </table>
+        </div>
+      </details>
+    </article>
+
+    <article class="chart-card">
+      <h2>Gewicht (kg)</h2>
+      <p class="chart-note">Gleiche Altersachse wie bei der Größe, zum direkten Vergleich.</p>
+      <div class="legend" id="legend-weight"></div>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-weight" viewBox="0 0 680 380" role="img" aria-label="Gewichtsverlauf der vier Kinder"></svg>
+        <div class="tooltip" id="tooltip-weight"></div>
+      </div>
+      <details class="rawdata">
+        <summary>Rohdaten anzeigen</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kind</th><th>Alter (J.)</th><th>Gewicht (kg)</th></tr></thead>
+            <tbody id="table-weight"></tbody>
+          </table>
+        </div>
+      </details>
+    </article>
+  </section>
+
+  <footer class="source">
+    Quelle: <code>Kinder/Statistik.gsheet</code> (Google Sheet), ausgewertet in
+    <code>familie/wachstumsstatistik.md</code> der Wissensdatenbank. Nur für Matthias sichtbar.
+  </footer>
+</div>
+
+<script type="module">
+import { schuetzeSeite } from "../../js/guard.js";
+import { db } from "../../js/auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const ARTEFAKT_ID = "wachstumskurven";
+
+(async function () {
+  await schuetzeSeite(ARTEFAKT_ID);
+  const snap = await getDoc(doc(db, "artefakte", ARTEFAKT_ID));
+  const data = snap.data();
+
+  // Firestore kennt keine verschachtelten Arrays — {a,v}-Objekte zurück in
+  // [age, value]-Tupel wandeln, damit die unveränderte Original-Render-Logik
+  // unten (erwartet p[0]/p[1]) unangetastet bleibt.
+  function toTuples(dataset) {
+    return Object.fromEntries(
+      Object.entries(dataset).map(([kid, pairs]) => [kid, pairs.map((p) => [p.a, p.v])]),
+    );
+  }
+  const heightData = toTuples(data.heightData);
+  const weightData = toTuples(data.weightData);
+
+  const KIDS = [
+    { key: 'Lenny',  varName: '--series-lenny'  },
+    { key: 'Emil',   varName: '--series-emil'   },
+    { key: 'Hannes', varName: '--series-hannes' },
+    { key: 'Liddy',  varName: '--series-liddy'  },
+  ];
+
+  const fmt = (n, d = 1) => n.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  // ---- stat tiles ----
+  const statGrid = document.getElementById('stat-grid');
+  KIDS.forEach(k => {
+    const h = heightData[k.key].at(-1);
+    const w = weightData[k.key].at(-1);
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    const ageNote = h[0] !== w[0]
+      ? `<div class="note">Gewicht zuletzt mit ${fmt(w[0])} J. gemessen</div>` : '';
+    card.innerHTML = `
+      <div class="kid"><span class="dot" style="background:var(${k.varName})"></span>${k.key}</div>
+      <div class="figures">
+        <div class="figure"><span class="value">${fmt(h[1])} cm</span><span class="label">Größe · ${fmt(h[0])} J.</span></div>
+        <div class="figure"><span class="value">${fmt(w[1])} kg</span><span class="label">Gewicht</span></div>
+      </div>
+      ${ageNote}`;
+    statGrid.appendChild(card);
+  });
+
+  // ---- raw data tables ----
+  function fillTable(tbodyId, dataset, decimals) {
+    const tbody = document.getElementById(tbodyId);
+    const rows = [];
+    KIDS.forEach(k => dataset[k.key].forEach(([age, val]) => rows.push([k.key, age, val])));
+    tbody.innerHTML = rows.map(([name, age, val]) =>
+      `<tr><td>${name}</td><td>${fmt(age)}</td><td>${fmt(val, decimals)}</td></tr>`
+    ).join('');
+  }
+  fillTable('table-height', heightData, 1);
+  fillTable('table-weight', weightData, 2);
+
+  // ---- legends ----
+  function buildLegend(id) {
+    document.getElementById(id).innerHTML = KIDS.map(k =>
+      `<span class="legend-item"><span class="dot" style="background:var(${k.varName})"></span>${k.key}</span>`
+    ).join('');
+  }
+  buildLegend('legend-height');
+  buildLegend('legend-weight');
+
+  // ---- chart engine ----
+  const NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function buildChart({ svgId, tooltipId, dataset, yMin, yMax, yTicks, unit, decimals }) {
+    const svg = document.getElementById(svgId);
+    const tooltip = document.getElementById(tooltipId);
+    const W = 680, H = 380, padL = 46, padR = 62, padT = 18, padB = 34;
+    const pw = W - padL - padR, ph = H - padT - padB;
+    const xMax = 13;
+    const xTicks = [0, 2, 4, 6, 8, 10, 12];
+
+    const xScale = age => padL + (age / xMax) * pw;
+    const yScale = val => padT + ph - ((val - yMin) / (yMax - yMin)) * ph;
+
+    svg.innerHTML = '';
+
+    // gridlines + y labels
+    yTicks.forEach(t => {
+      const y = yScale(t);
+      svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: y, y2: y, style: 'stroke:var(--grid)', 'stroke-width': 1 }));
+      const label = svgEl('text', { x: padL - 8, y: y + 4, 'text-anchor': 'end', 'font-size': 11, style: 'fill:var(--muted)' });
+      label.textContent = t;
+      svg.appendChild(label);
+    });
+
+    // x axis ticks + labels
+    svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: padT + ph, y2: padT + ph, style: 'stroke:var(--axis)', 'stroke-width': 1 }));
+    xTicks.forEach(t => {
+      const x = xScale(t);
+      const label = svgEl('text', { x, y: padT + ph + 20, 'text-anchor': 'middle', 'font-size': 11, style: 'fill:var(--muted)' });
+      label.textContent = t + ' J.';
+      svg.appendChild(label);
+    });
+
+    // lines + points
+    const endLabels = [];
+    const hoverDots = {};
+    KIDS.forEach(k => {
+      const pts = dataset[k.key];
+      const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xScale(p[0]).toFixed(1)},${yScale(p[1]).toFixed(1)}`).join(' ');
+      svg.appendChild(svgEl('path', { d, style: `stroke:var(${k.varName});fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round` }));
+      pts.forEach(p => {
+        svg.appendChild(svgEl('circle', { cx: xScale(p[0]), cy: yScale(p[1]), r: 2.4, style: `fill:var(${k.varName})`, opacity: 0.85 }));
+      });
+      const last = pts[pts.length - 1];
+      endLabels.push({ x: xScale(last[0]) + 8, y: yScale(last[1]), k });
+
+      const hover = svgEl('circle', { r: 5, style: `fill:var(${k.varName});stroke:var(--surface-1);stroke-width:2`, opacity: 0 });
+      svg.appendChild(hover);
+      hoverDots[k.key] = hover;
+    });
+
+    // end-of-line direct labels, collision-avoided
+    endLabels.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < endLabels.length; i++) {
+      if (endLabels[i].y - endLabels[i - 1].y < 14) endLabels[i].y = endLabels[i - 1].y + 14;
+    }
+    endLabels.forEach(l => {
+      const text = svgEl('text', { x: l.x, y: l.y + 4, 'font-size': 12, 'font-weight': 600, style: `fill:var(${l.k.varName})` });
+      text.textContent = l.k.key;
+      svg.appendChild(text);
+    });
+
+    // crosshair
+    const crosshair = svgEl('line', { x1: 0, x2: 0, y1: padT, y2: padT + ph, style: 'stroke:var(--axis)', 'stroke-width': 1, 'stroke-dasharray': '3,3', opacity: 0 });
+    svg.appendChild(crosshair);
+
+    // interaction overlay
+    const overlay = svgEl('rect', { x: padL, y: padT, width: pw, height: ph, fill: 'transparent', 'pointer-events': 'all' });
+    svg.appendChild(overlay);
+
+    function nearest(pts, age) {
+      let best = pts[0], bestDiff = Math.abs(pts[0][0] - age);
+      for (const p of pts) {
+        const diff = Math.abs(p[0] - age);
+        if (diff < bestDiff) { best = p; bestDiff = diff; }
+      }
+      return best;
+    }
+
+    overlay.addEventListener('pointermove', ev => {
+      const rect = svg.getBoundingClientRect();
+      const scale = W / rect.width;
+      const vbX = (ev.clientX - rect.left) * scale;
+      const age = Math.max(0, Math.min(xMax, (vbX - padL) / pw * xMax));
+      const cx = xScale(age);
+      crosshair.setAttribute('x1', cx);
+      crosshair.setAttribute('x2', cx);
+      crosshair.setAttribute('opacity', 1);
+
+      const rows = KIDS.map(k => {
+        const p = nearest(dataset[k.key], age);
+        hoverDots[k.key].setAttribute('cx', xScale(p[0]));
+        hoverDots[k.key].setAttribute('cy', yScale(p[1]));
+        hoverDots[k.key].setAttribute('opacity', 1);
+        return `<div class="row"><span class="who"><span class="dot" style="width:8px;height:8px;background:var(${k.varName})"></span>${k.key}</span><span class="val">${fmt(p[1], decimals)} ${unit}</span></div>`;
+      }).join('');
+      tooltip.innerHTML = `<div class="age">Alter ~ ${fmt(age)} Jahre</div>${rows}`;
+      tooltip.classList.add('visible');
+
+      const leftPx = (cx / W) * rect.width;
+      const wrapWidth = rect.width;
+      const tipWidth = 190;
+      tooltip.style.left = (leftPx + tipWidth > wrapWidth ? leftPx - tipWidth - 14 : leftPx + 14) + 'px';
+      tooltip.style.top = '6px';
+    });
+
+    overlay.addEventListener('pointerleave', () => {
+      crosshair.setAttribute('opacity', 0);
+      KIDS.forEach(k => hoverDots[k.key].setAttribute('opacity', 0));
+      tooltip.classList.remove('visible');
+    });
+  }
+
+  buildChart({ svgId: 'chart-height', tooltipId: 'tooltip-height', dataset: heightData, yMin: 40, yMax: 165, yTicks: [40, 60, 80, 100, 120, 140, 160], unit: 'cm', decimals: 1 });
+  buildChart({ svgId: 'chart-weight', tooltipId: 'tooltip-weight', dataset: weightData, yMin: 0, yMax: 45, yTicks: [0, 10, 20, 30, 40], unit: 'kg', decimals: 2 });
+})();
+</script>
+
+</body></html>
