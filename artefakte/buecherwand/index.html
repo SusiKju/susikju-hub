@@ -1,0 +1,641 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Bücherwand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --ground:#141417; --ground-2:#1b1b20; --line: rgba(255,255,255,.09);
+    --text:#eceae4; --text-soft:#8f8d89; --text-faint:#5c5a57;
+    --paper:#f6efdf; --paper-ink:#2c2416; --paper-soft:#7a6e56; --paper-accent:#8a5a1f; --paper-accent-ink:#4a3110;
+    --status-read:#7d9488; --status-reading:#d68f2c; --status-unread:#ec4d52; --status-tobuy:#4f8ff0;
+    --focus:#e0b56d;
+    color-scheme: dark;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; height:100%; }
+  body{
+    background: var(--ground); color:var(--text);
+    font-family:"Manrope", ui-sans-serif, system-ui, sans-serif;
+    padding-inline:16px;
+    padding-block: max(14px, env(safe-area-inset-top,0px)) max(32px, env(safe-area-inset-bottom,0px));
+  }
+  img{ max-width:100%; }
+  [hidden]{ display:none !important; }
+  button{ font-family:inherit; }
+  a{ color:inherit; }
+  :focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  .page-wrap{ max-width:none; }
+
+  /* ---- top bar ---- */
+  #topbar{
+    position:sticky; top: env(safe-area-inset-top,0px); z-index:30;
+    background: rgba(20,20,23,.86); backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--line);
+    margin: 0 -16px 26px; padding: 10px 16px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  #topbar h1{
+    font-family:"Literata", Georgia, serif; font-weight:600; font-size:1.15rem; margin:0;
+    flex:0 0 auto; text-wrap:balance;
+  }
+  #search{
+    background: var(--ground-2); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:7px 11px; font-size:.82rem; width: clamp(110px, 22vw, 200px);
+  }
+  #search::placeholder{ color: var(--text-faint); }
+  /* Status/favorite filter chips fill the wide gap the topbar otherwise leaves empty
+     on desktop between the title and the search field. Each chip's active look
+     borrows that status's own color, so an active filter reads at a glance. */
+  #filters{
+    flex:1 1 auto; display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  }
+  .chip{
+    font-family:inherit; font-size:.74rem; color:var(--text-soft); background:var(--ground-2);
+    border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer;
+    white-space:nowrap; transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .chip:hover{ color:var(--text); border-color:var(--text-soft); }
+  .chip.active{ color:var(--ground); background:var(--text-soft); border-color:var(--text-soft); font-weight:700; }
+  .chip.chip-fav.active{ background:var(--focus); border-color:var(--focus); color:#2c2416; }
+  .chip[data-status="reading"].active{ background:var(--status-reading); border-color:var(--status-reading); color:#2c1c04; }
+  .chip[data-status="unread"].active{ background:var(--status-unread); border-color:var(--status-unread); color:#2c0404; }
+  .chip[data-status="read"].active{ background:var(--status-read); border-color:var(--status-read); color:#0c1410; }
+  .chip[data-status="tobuy"].active{ background:var(--status-tobuy); border-color:var(--status-tobuy); color:#04122c; }
+
+  /* ---- pinned focus row: a small, quiet strip up top — currently-reading and
+     not-yet-purchased books side by side, always visible regardless of the wall
+     below. Deliberately smaller/quieter than the wall itself, not bigger. ---- */
+  #reading-focus:empty{ display:none; }
+  #reading-focus .focus-top{
+    display:flex; align-items:stretch; flex-wrap:wrap;
+    margin: 0 -14px 14px; border-bottom:1px solid var(--line);
+  }
+  #reading-focus .focus-panel{
+    display:flex; flex-direction:column; padding:6px 12px 9px; min-width:0;
+  }
+  #reading-focus .focus-panel + .focus-panel{ border-left:1px solid var(--line); }
+  #reading-focus .focus-panel.reading{
+    background: linear-gradient(180deg, color-mix(in srgb, var(--status-reading) 7%, transparent), transparent);
+  }
+  #reading-focus .focus-panel.tobuy{
+    background: linear-gradient(180deg, color-mix(in srgb, var(--status-tobuy) 7%, transparent), transparent);
+  }
+  #reading-focus .focus-panel.unread{
+    background: linear-gradient(180deg, color-mix(in srgb, var(--status-unread) 7%, transparent), transparent);
+  }
+  #reading-focus .rf-label{
+    font-size:.54rem; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
+    margin-bottom:6px;
+  }
+  #reading-focus .focus-panel.reading .rf-label{ color: var(--status-reading); }
+  #reading-focus .focus-panel.tobuy .rf-label{ color: var(--status-tobuy); }
+  #reading-focus .focus-panel.unread .rf-label{ color: var(--status-unread); }
+  #reading-focus .rf-row{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:7px; }
+  #reading-focus .cover-item{ width: clamp(36px, 4.5vw, 50px); }
+  #reading-focus .ci-cap, #reading-focus .ci-dates{ display:none; }
+  /* No "opened book" effect up here — just the plain cover, small and calm. */
+  #reading-focus .cover-item.is-reading .ci-img{ transform:none; box-shadow:none; }
+  #reading-focus .cover-item.is-reading .ci-pages{ display:none; }
+  #reading-focus .cover-item.is-reading:hover .ci-img,
+  #reading-focus .cover-item.is-reading:focus-visible .ci-img{
+    transform: scale(1.6); transform-origin:center center;
+    box-shadow: 0 10px 20px rgba(0,0,0,.5);
+  }
+
+  /* ---- cover wall: rows fill up freely and wrap like text; each book carries its
+     own segment of its series' colour strip, so the line simply continues wherever
+     the row happens to break, instead of one block that has to stay intact. ---- */
+  .cover-grid{
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:18px 4px;
+    padding-top: 18px;
+  }
+  .cover-item{
+    position:relative; border:none; padding:0; cursor:pointer; background:none;
+    width: clamp(72px, 10vw, 100px); flex:0 0 auto; overflow:visible;
+  }
+  .cover-item.gap-series{ margin-left:26px; }
+  .cover-item.gap-author{ margin-left:54px; }
+  /* Covers keep a thin 4px gap so they don't visually stick together, but each
+     strip (except the last in its run) bridges exactly that gap on its right edge,
+     so the colour line itself still reads as one unbroken bar. Square corners keep
+     the bridged seams invisible. The wider margins above still break the line
+     clearly at a series or author change (bridging is never applied there). */
+  .ci-strip{ height:3px; border-radius:0; margin-top:5px; }
+  .ci-strip.bridge{ width:calc(100% + 4px); margin-right:-4px; }
+  /* Three dates, always three lines — even when a book has no Handlung/Kaufdatum,
+     an em-dash holds the line's place. Fixed height (not just line-count) keeps
+     every cover exactly as tall as its neighbours, so rows stay flat: no staircase
+     even though the wall wraps freely and not every book carries all three dates. */
+  .ci-dates{
+    height:40px; margin-top:4px; font-size:.58rem; line-height:1.3;
+    color:var(--text-faint); font-variant-numeric:tabular-nums; overflow:hidden;
+  }
+  .ci-dates .hd{ font-style:italic; color:var(--text-soft); }
+  /* A run's opener: a slim vertical tag naming author and year span, sitting flush
+     against the first cover. Its own bottom strip continues the line leftward, so
+     the bar starts at the tag's own left edge, not just at the first cover. A
+     spacer below the strip matches the covers' date block so both strips still
+     line up at the same height. */
+  .run-tag{
+    align-self:flex-end; flex:0 0 auto; width:22px; min-height:96px;
+    display:flex; flex-direction:column; align-items:center;
+    border-radius:4px 4px 0 0; padding:8px 0 0;
+  }
+  .run-tag .rt-label{
+    flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+    writing-mode: vertical-rl; transform:rotate(180deg);
+    font-size:.64rem; font-weight:700; letter-spacing:.04em; white-space:nowrap;
+  }
+  .run-tag .rt-strip{ width:calc(100% + 4px); height:3px; margin:5px -4px 0 0; }
+  .run-tag .rt-spacer{ height:40px; margin-top:4px; flex:0 0 auto; }
+  .run-tag.gap-series{ margin-left:26px; }
+  .run-tag.gap-author{ margin-left:54px; }
+  /* Phones: smaller covers than desktop, and a slimmer page gutter so more of the
+     screen is actual content. gap-series/gap-author still add their usual left margin
+     to mark a run change — but that margin is stripped via .row-start (set in JS,
+     see fixRowStarts) whenever the marked item lands first on a wrapped line, so a
+     line break never itself creates a big dead indent on the left. */
+  @media (max-width:480px){
+    body{ padding-inline:8px; }
+    .cover-item{ width: clamp(64px, 20vw, 86px); }
+    .cover-item.gap-series{ margin-left:12px; }
+    .cover-item.gap-author{ margin-left:24px; }
+    .run-tag{ width:18px; min-height:72px; }
+    .run-tag.gap-series{ margin-left:12px; }
+    .run-tag.gap-author{ margin-left:24px; }
+  }
+  .cover-item.row-start, .run-tag.row-start{ margin-left:0 !important; }
+  /* Nur transform+opacity animiert — beides laeuft rein auf dem Compositor-Thread ohne
+     Neuzeichnen. box-shadow/filter aendern sich weiterhin beim Hover, aber ungetweent
+     (ein einmaliges Neuzeichnen statt eines pro Frame ueber 160ms) — das war bei vielen
+     Cover-Items gleichzeitig der Grund fuer das Ruckeln beim Hovern. */
+  .cover-item .ci-img{
+    width:100%; aspect-ratio:2/3; border-radius:4px; overflow:hidden; position:relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    transition: transform .16s ease, opacity .16s ease;
+    transform-origin: center center;
+  }
+  .cover-item img{ width:100%; height:100%; object-fit:cover; display:block; border-radius:4px; }
+  .cover-item .ci-fallback{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center; text-align:center;
+    background: var(--paper-accent); color:#fff; font-family:"Literata",serif; font-style:italic; font-size:.7rem; padding:6px;
+    border-radius:4px;
+  }
+  .cover-item:hover, .cover-item:focus-visible{ z-index:9; }
+  .cover-item:hover .ci-img, .cover-item:focus-visible .ci-img{
+    transform: scale(2); box-shadow: 0 24px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.15);
+    opacity:1; filter:none; will-change: transform;
+  }
+
+  /* Gelesene Buecher treten zurueck: blasser, entsaettigt — bei Hover wieder voll da. */
+  .cover-item.is-read .ci-img{ opacity:.45; filter:saturate(65%); }
+  .cover-item.is-read:hover .ci-img, .cover-item.is-read:focus-visible .ci-img{ opacity:1; filter:none; }
+
+  /* Buecher, die gerade gelesen werden, stehen deutlich aufgeklappt und etwas groesser
+     da statt platt an der Wand zu kleben. ci-pages ist KEIN flach aufgeklebter Streifen
+     mehr, sondern eine echte 3D-Flaeche: sie steht per rotateY(90deg) im rechten Winkel
+     zum Cover (wie die tatsaechliche Seitenkante eines Buchs) und wird dank preserve-3d
+     gemeinsam mit dem Cover perspektivisch verzerrt — dadurch passt sie geometrisch
+     exakt an die Coverkante an, statt wie zuvor als loser, unverzerrter Balken danebenzustehen. */
+  .cover-item.is-reading{ z-index:3; }
+  .cover-item.is-reading .ci-img{
+    overflow:visible;
+    transform-style: preserve-3d;
+    transform: perspective(320px) rotateY(-24deg);
+    transform-origin: left center;
+    box-shadow: 4px 6px 14px rgba(0,0,0,.6);
+  }
+  .cover-item.is-reading .ci-pages{
+    position:absolute; top:0; right:0; width:9px; height:100%;
+    transform: rotateY(90deg);
+    transform-origin: left center;
+    background-image:
+      linear-gradient(to right, rgba(0,0,0,.32), rgba(0,0,0,0) 40%, rgba(0,0,0,0) 60%, rgba(0,0,0,.4)),
+      repeating-linear-gradient(to bottom, #f4ecd8 0 2px, #d9c9a0 2px 3px);
+  }
+  .cover-item.is-reading:hover .ci-img, .cover-item.is-reading:focus-visible .ci-img{
+    transform: scale(2); transform-origin:center center;
+    box-shadow: 0 24px 44px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.15);
+  }
+  .cover-item.is-reading:hover .ci-pages, .cover-item.is-reading:focus-visible .ci-pages{ opacity:0; }
+
+  /* Noch nicht gekauft: ein Geisterplatz im Regal — entsaettigt, gestrichelt umrandet,
+     wie ein reservierter Platz statt eines echten Buchs. Bleibt auch beim Hovern
+     erkennbar entsaettigt, nur die Abdunklung verschwindet zum genaueren Hinsehen. */
+  .cover-item.is-tobuy .ci-img{
+    opacity:.55; filter:grayscale(100%);
+    outline:2px dashed var(--status-tobuy); outline-offset:2px;
+  }
+  .cover-item.is-tobuy:hover .ci-img, .cover-item.is-tobuy:focus-visible .ci-img{ opacity:1; }
+
+  /* Ungelesen, aber vorhanden: ein duenner, durchgehender weisser Ring hebt das Cover
+     von den blassen gelesenen Buechern ab — im Unterschied zum gestrichelten Rand der
+     noch nicht gekauften Buecher. */
+  .cover-item.is-unread .ci-img{ outline:1px solid rgba(255,255,255,.92); outline-offset:2px; }
+
+  .ci-cap{
+    position:absolute; left:0; right:0; bottom:0; padding:8px 6px 6px;
+    background: linear-gradient(0deg, rgba(0,0,0,.88), transparent);
+    opacity:0; transition:opacity .16s ease; pointer-events:none;
+  }
+  .cover-item:hover .ci-cap, .cover-item:focus-visible .ci-cap{ opacity:1; }
+  .ci-cap .t{ font-family:"Literata",serif; font-weight:700; font-size:.68rem; color:#fff; line-height:1.15; }
+  .ci-cap .y{ font-size:.6rem; color:#cfcdc8; margin-top:1px; }
+
+  /* Ungelesen: einzige Markierung, die auffallen soll — kraeftig gefuellt, ohne Leuchtring,
+     mit Ausrufezeichen. Gelesen braucht keinen Punkt mehr, das blasse Cover spricht schon. */
+  .ci-dot{
+    position:absolute; top:5px; right:5px; width:17px; height:17px; border-radius:50%; z-index:1;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.62rem; font-weight:800; color:#fff; font-family:"Manrope",sans-serif;
+    background: var(--status-unread); box-shadow: 0 2px 6px rgba(0,0,0,.6);
+  }
+  .ci-dot.tobuy{ background: var(--status-tobuy); }
+
+  /* Favorit: eigener Fleck oben links, damit er nie mit dem Ungelesen-Punkt (oben
+     rechts) kollidiert — voller Stern, kraeftiges Gold, mit Schlagschatten fuer
+     Kontrast auf jedem Cover. */
+  .ci-fav{
+    position:absolute; top:3px; left:3px; z-index:2;
+    font-size:1.2rem; line-height:1; color:#ffcb3d;
+    text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 5px rgba(0,0,0,.6);
+  }
+
+  .empty-note{ text-align:center; color:var(--text-soft); font-style:italic; font-family:"Literata",serif; padding: 40px 0; }
+
+  /* ---- open-book modal (index card) ---- */
+  .backdrop{
+    position:fixed; inset:0; background: rgba(0,0,0,.7);
+    backdrop-filter: blur(3px);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; z-index:50;
+  }
+  .book-modal{
+    position:relative; width:min(760px, 100%); max-height: 88vh; overflow:auto;
+    background: var(--paper); color:var(--paper-ink);
+    border-radius:10px; box-shadow: 0 30px 70px rgba(0,0,0,.7);
+    display:grid; grid-template-columns: 1fr 1.15fr;
+  }
+  @media (max-width:600px){ .book-modal{ grid-template-columns:1fr; } }
+  .page-left{ padding:26px; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,.03); }
+  .page-left .m-cover{ width:100%; max-width:240px; aspect-ratio:2/3; border-radius:4px; overflow:hidden; box-shadow:0 10px 26px rgba(0,0,0,.3); }
+  .page-left .m-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .pv-fallback{
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:10px;
+    background: var(--paper-accent); color:#fff; font-family:"Literata",serif; font-style:italic; font-size:.85rem;
+  }
+  .page-left .m-cover .pv-fallback{ width:100%; height:100%; }
+  .page-right{ padding:28px 30px 30px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .close-btn{
+    position:absolute; top:10px; right:12px; background:none; border:none;
+    font-size:1.3rem; line-height:1; color: var(--paper-soft); cursor:pointer; padding:6px;
+  }
+  .close-btn:hover{ color: var(--paper-ink); }
+  .m-eyebrow{ font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; }
+  .m-title{ font-size:1.5rem; font-weight:700; line-height:1.15; font-family:"Literata",serif; }
+  .m-author{ font-size:.95rem; color:var(--paper-soft); }
+  .m-meta{ display:flex; flex-wrap:wrap; gap:8px 14px; font-size:.82rem; color:var(--paper-soft); }
+  .m-meta b{ color:var(--paper-ink); font-variant-numeric:tabular-nums; }
+  .m-summary{ font-family:"Literata", serif; font-size:1rem; line-height:1.55; }
+  .m-actions{ margin-top:auto; padding-top:10px; }
+  .m-actions-label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--paper-soft); margin-bottom:6px; }
+  .status-switch{ display:flex; gap:6px; flex-wrap:wrap; }
+  .status-opt{
+    flex:1 1 auto; border-radius:8px; padding:9px 10px; font-weight:700; font-size:.8rem;
+    cursor:pointer; border:1.5px solid var(--paper-accent); background:transparent; color:var(--paper-accent-ink);
+  }
+  .status-opt.active{ color:#fff; border-color:transparent; }
+  .status-opt.active[data-status="read"]{ background:var(--status-read); }
+  .status-opt.active[data-status="reading"]{ background:var(--status-reading); }
+  .status-opt.active[data-status="unread"]{ background:var(--status-unread); }
+  .status-opt.active[data-status="tobuy"]{ background:var(--status-tobuy); }
+  .fav-btn{
+    margin-top:8px; width:100%; border-radius:8px; padding:9px 10px; font-weight:700; font-size:.8rem;
+    cursor:pointer; border:1.5px solid #d9a520; background:transparent; color:#8a6416;
+  }
+  .fav-btn.active{ background:#ffcb3d; border-color:transparent; color:#4a3400; }
+
+  footer{ text-align:center; color:var(--text-faint); font-size:.72rem; padding-top:26px; }
+  footer a{ color:var(--text-soft); }
+</style>
+
+<div class="page-wrap">
+  <div id="topbar">
+    <h1>Bücherwand</h1>
+    <div id="filters">
+      <button class="chip" data-filter="all">Alle</button>
+      <button class="chip chip-fav" data-fav="1">★ Favoriten</button>
+      <button class="chip" data-status="reading">Wird gelesen</button>
+      <button class="chip" data-status="unread">Ungelesen</button>
+      <button class="chip" data-status="read">Gelesen</button>
+      <button class="chip" data-status="tobuy">Nicht gekauft</button>
+    </div>
+    <input id="search" type="search" placeholder="Suchen…" autocomplete="off">
+  </div>
+
+  <div id="reading-focus"></div>
+  <div id="shelves"></div>
+  <footer>Wissensdatenbank Familie Redmann · komprimierte Übersicht · siehe <code>buecherbibliothek.md</code></footer>
+</div>
+
+<div id="modalRoot"></div>
+
+<script type="module">
+  import { schuetzeSeite } from "../../js/guard.js";
+  import { db } from "../../js/auth.js";
+  import { doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+  const ARTEFAKT_ID = "buecherwand";
+
+  let books = [];
+  const shelfPalette = ["#d98a5f","#c9a15a","#5b8fb0","#7f9ed1","#a97c50","#8a6fa8","#5fa88a"];
+  let shelfColor = {};
+  function computeShelfColors(){
+    shelfColor = {};
+    let paletteI = 0;
+    books.forEach(b => { if (!(b.shelf in shelfColor)){ shelfColor[b.shelf] = shelfPalette[paletteI % shelfPalette.length]; paletteI++; } });
+  }
+
+  let searchQuery = "";
+  let statusFilter = null; // null | "read" | "reading" | "unread" | "tobuy"
+  let favOnly = false;
+  let openBookId = null;
+
+
+  // Reorders books so every author's books sit next to each other, like arranging
+  // a real shelf by hand — author by author, and within an author, series by series.
+  function orderedForWall(list){
+    const authorOrder = [], authorBuckets = {};
+    list.forEach(b => {
+      if (!authorBuckets[b.author]){ authorBuckets[b.author] = []; authorOrder.push(b.author); }
+      authorBuckets[b.author].push(b);
+    });
+    return authorOrder.flatMap(author => {
+      const shelfOrder = [], shelfBuckets = {};
+      authorBuckets[author].forEach(b => {
+        if (!shelfBuckets[b.shelf]){ shelfBuckets[b.shelf] = []; shelfOrder.push(b.shelf); }
+        shelfBuckets[b.shelf].push(b);
+      });
+      return shelfOrder.flatMap(shelf => shelfBuckets[shelf]);
+    });
+  }
+
+  function findBook(id){ return books.find(b => b.id === id); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function matches(b){
+    if (searchQuery && !(b.title + " " + b.author).toLowerCase().includes(searchQuery)) return false;
+    if (statusFilter && b.status !== statusFilter) return false;
+    if (favOnly && !b.favorite) return false;
+    return true;
+  }
+  function updateFilterChipsUI(){
+    document.querySelectorAll("#filters .chip").forEach(chip => {
+      let active;
+      if (chip.dataset.filter === "all") active = !statusFilter && !favOnly;
+      else if (chip.dataset.fav) active = favOnly;
+      else active = statusFilter === chip.dataset.status;
+      chip.classList.toggle("active", active);
+    });
+  }
+
+  function coverImgOrFallback(b, cls){
+    if (b.cover) return `<img src="${b.cover}" alt="Cover: ${esc(b.title)}" loading="lazy" decoding="async">`;
+    return `<div class="${cls}"><span>${esc(b.title)}</span></div>`;
+  }
+
+  function actionYear(b){ const m = (b.era || "").match(/\d{4}/); return m ? m[0] : null; }
+  function shortKaufdatum(b){
+    if (!b.kaufdatum) return null;
+    const p = b.kaufdatum.split(".");
+    return p.length === 3 ? `${p[0]}.${p[1]}.${p[2].slice(2)}` : b.kaufdatum;
+  }
+
+  function coverItemHtml(b, gapClass, bridge){
+    const statusClass = b.status === "reading" ? " is-reading" : b.status === "read" ? " is-read" : b.status === "tobuy" ? " is-tobuy" : b.status === "unread" ? " is-unread" : "";
+    const classes = "cover-item" + (gapClass ? " " + gapClass : "") + statusClass;
+    return `<button class="${classes}" data-open="${b.id}" aria-label="${esc(b.title)} aufschlagen">
+      <div class="ci-img">
+        ${coverImgOrFallback(b, "ci-fallback")}
+        <div class="ci-cap"><div class="t">${esc(b.title)}</div><div class="y">${esc(b.author)} · ${b.year}</div></div>
+        ${b.status === "reading" ? '<div class="ci-pages"></div>' : ""}
+      </div>
+      ${b.status === "unread" ? '<span class="ci-dot" aria-hidden="true">!</span>' : ""}
+      ${b.status === "tobuy" ? '<span class="ci-dot tobuy" aria-hidden="true">+</span>' : ""}
+      ${b.favorite ? '<span class="ci-fav" aria-hidden="true">★</span>' : ""}
+      <div class="ci-strip${bridge ? " bridge" : ""}" style="background:${shelfColor[b.shelf]}"></div>
+      <div class="ci-dates">
+        <div>E ${b.year}</div>
+        <div class="hd">H ${actionYear(b) || "–"}</div>
+        <div>K ${shortKaufdatum(b) || "–"}</div>
+      </div>
+    </button>`;
+  }
+
+  // A run is an uninterrupted stretch of the same author's same series — the unit
+  // the vertical tag and colour strip are drawn for. Rows fill up and wrap freely;
+  // each cover carries its own strip segment, so the line just continues on the
+  // next row wherever the wrap happens to fall.
+  function buildRuns(list){
+    const runs = [];
+    list.forEach(b => {
+      const last = runs[runs.length - 1];
+      if (last && last.author === b.author && last.shelf === b.shelf){
+        last.books.push(b);
+      } else {
+        runs.push({ author: b.author, shelf: b.shelf, books: [b] });
+      }
+    });
+    return runs;
+  }
+
+  function runLabel(run){
+    const years = run.books.map(b => b.year);
+    const lo = Math.min(...years), hi = Math.max(...years);
+    return `${run.author} · ${lo === hi ? lo : lo + "–" + hi}`;
+  }
+
+  function wallHtml(runs){
+    return runs.map((run, i) => {
+      let gapClass = "";
+      if (i > 0) gapClass = runs[i - 1].author !== run.author ? "gap-author" : "gap-series";
+      const color = shelfColor[run.shelf];
+      const tag = `<div class="run-tag ${gapClass}" style="background:color-mix(in srgb, ${color} 24%, var(--ground-2)); color:${color};">
+        <span class="rt-label">${esc(runLabel(run))}</span>
+        <span class="rt-strip" style="background:${color}"></span>
+        <span class="rt-spacer"></span>
+      </div>`;
+      const covers = run.books.map((b, j) => coverItemHtml(b, "", j < run.books.length - 1)).join("");
+      return tag + covers;
+    }).join("");
+  }
+
+  // Pinned above everything else, independent of the search box — always answers
+  // "what am I reading right now" regardless of what the wall below is filtered to.
+  function renderReadingFocus(){
+    const el = document.getElementById("reading-focus");
+    const reading = books.filter(b => b.status === "reading");
+    const unread = books.filter(b => b.status === "unread");
+    const tobuy = books.filter(b => b.status === "tobuy");
+    if (!reading.length && !unread.length && !tobuy.length){ el.innerHTML = ""; return; }
+    const panel = (cls, label, list) => !list.length ? "" : `
+      <div class="focus-panel ${cls}">
+        <div class="rf-label">${label}</div>
+        <div class="rf-row">${list.map(b => coverItemHtml(b)).join("")}</div>
+      </div>`;
+    el.innerHTML = `<div class="focus-top">${panel("reading","Wird gerade gelesen",reading)}${panel("unread","Ungelesen",unread)}${panel("tobuy","Nicht gekauft",tobuy)}</div>`;
+  }
+
+  function renderShelves(){
+    renderReadingFocus();
+    const filtered = orderedForWall(books.filter(matches));
+    const shelvesEl = document.getElementById("shelves");
+    if (!filtered.length){ shelvesEl.innerHTML = `<div class="empty-note">Kein Buch gefunden.</div>`; return; }
+    shelvesEl.innerHTML = `<div class="cover-grid">${wallHtml(buildRuns(filtered))}</div>`;
+    fixRowStarts();
+  }
+
+  // gap-series/gap-author add a left margin to mark a run change — but flexbox never
+  // waives that margin just because the item happens to land first on a wrapped line,
+  // which used to show up as a big dead indent at the left edge. Strip the margin (via
+  // .row-start) on whichever items actually open a line, found by watching each item's
+  // left position reset backwards compared to the one before it.
+  function fixRowStarts(){
+    const grid = document.querySelector("#shelves .cover-grid");
+    if (!grid) return;
+    let prevLeft = -Infinity;
+    Array.from(grid.children).forEach(el => {
+      const left = el.getBoundingClientRect().left;
+      const isRowStart = left <= prevLeft + 1;
+      if (el.classList.contains("gap-series") || el.classList.contains("gap-author")){
+        el.classList.toggle("row-start", isRowStart);
+      }
+      prevLeft = left;
+    });
+  }
+  let rowStartResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(rowStartResizeTimer);
+    rowStartResizeTimer = setTimeout(fixRowStarts, 120);
+  });
+  if (document.fonts && document.fonts.ready){ document.fonts.ready.then(fixRowStarts); }
+
+  function renderModal(){
+    const root = document.getElementById("modalRoot");
+    if (!openBookId){ root.innerHTML = ""; return; }
+    const b = findBook(openBookId);
+    if (!b){ root.innerHTML = ""; return; }
+    root.innerHTML = `
+      <div class="backdrop" data-close="1">
+        <div class="book-modal" role="dialog" aria-modal="true" aria-label="${esc(b.title)}">
+          <button class="close-btn" data-close="1" aria-label="Schließen">✕</button>
+          <div class="page-left">
+            <div class="m-cover">${coverImgOrFallback(b, "pv-fallback")}</div>
+          </div>
+          <div class="page-right">
+            <div>
+              <div class="m-eyebrow" style="color:${shelfColor[b.shelf]}">${esc(b.shelf)}</div>
+              <div class="m-title">${esc(b.title)}</div>
+              <div class="m-author">${esc(b.author)}</div>
+            </div>
+            <div class="m-meta">
+              <span>${b.upcoming ? "Erscheint" : "Erschienen"} <b>${b.year}</b></span>
+              <span>${esc(b.era)}</span>
+              ${b.kaufdatum ? `<span>Gekauft am <b>${esc(b.kaufdatum)}</b></span>` : ""}
+            </div>
+            <p class="m-summary">${esc(b.summary)}</p>
+            <div class="m-actions">
+              <div class="m-actions-label">Lesestatus</div>
+              <div class="status-switch" role="group" aria-label="Lesestatus">
+                <button class="status-opt ${b.status === "tobuy" ? "active" : ""}" data-status="tobuy">Nicht gekauft</button>
+                <button class="status-opt ${b.status === "unread" ? "active" : ""}" data-status="unread">Ungelesen</button>
+                <button class="status-opt ${b.status === "reading" ? "active" : ""}" data-status="reading">Wird gelesen</button>
+                <button class="status-opt ${b.status === "read" ? "active" : ""}" data-status="read">Gelesen</button>
+              </div>
+              <button class="fav-btn ${b.favorite ? "active" : ""}" data-toggle-fav="1">
+                ${b.favorite ? "★ Favorit" : "☆ Als Favorit markieren"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // set() replaces the whole document, so every save writes both fields together —
+  // otherwise toggling one would silently erase the other.
+  function saveBook(b){
+    updateDoc(doc(db, "artefakte", ARTEFAKT_ID), { books }).catch(() => {});
+  }
+
+  function setStatus(id, status){
+    const b = findBook(id);
+    if (!b) return;
+    b.status = status;
+    renderShelves(); renderModal();
+    saveBook(b);
+  }
+
+  function toggleFavorite(id){
+    const b = findBook(id);
+    if (!b) return;
+    b.favorite = !b.favorite;
+    renderShelves(); renderModal();
+    saveBook(b);
+  }
+
+  document.getElementById("search").addEventListener("input", e => {
+    searchQuery = e.target.value.trim().toLowerCase();
+    renderShelves();
+  });
+
+  document.getElementById("filters").addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    if (chip.dataset.filter === "all"){ statusFilter = null; favOnly = false; }
+    else if (chip.dataset.fav){ favOnly = !favOnly; }
+    else { statusFilter = statusFilter === chip.dataset.status ? null : chip.dataset.status; }
+    updateFilterChipsUI();
+    renderShelves();
+  });
+
+  function openOnClick(e){
+    const card = e.target.closest("[data-open]");
+    if (card){ openBookId = card.dataset.open; renderModal(); }
+  }
+  document.getElementById("shelves").addEventListener("click", openOnClick);
+  document.getElementById("reading-focus").addEventListener("click", openOnClick);
+
+  document.getElementById("modalRoot").addEventListener("click", e => {
+    const statusBtn = e.target.closest("[data-status]");
+    if (statusBtn){ setStatus(openBookId, statusBtn.dataset.status); return; }
+    if (e.target.closest("[data-toggle-fav]")){ toggleFavorite(openBookId); return; }
+    if (e.target.closest("[data-close]") === e.target || e.target.dataset.close){ openBookId = null; renderModal(); }
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape" && openBookId){ openBookId = null; renderModal(); }
+  });
+
+  const artefaktRef = doc(db, "artefakte", ARTEFAKT_ID);
+
+  function applySnapshotData(data){
+    books = data.books || [];
+    computeShelfColors();
+    updateFilterChipsUI();
+    renderShelves();
+    renderModal();
+  }
+
+  (async function init(){
+    await schuetzeSeite(ARTEFAKT_ID);
+    const snap = await getDoc(artefaktRef);
+    if (snap.exists()) applySnapshotData(snap.data());
+    onSnapshot(artefaktRef, (snap) => {
+      if (snap.exists()) applySnapshotData(snap.data());
+    });
+  })();
+</script>
+
+</body></html>

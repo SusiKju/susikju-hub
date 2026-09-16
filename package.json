@@ -1,0 +1,9 @@
+{
+  "name": "susikju-hub-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Node-Skripte für Export/Sync (nicht Teil der statischen Site selbst, die braucht kein npm).",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
