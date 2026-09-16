@@ -24,9 +24,10 @@ Regeln für jeden Ordner:
   Artefakt-URL), `updatedAt`, `previewImage` (relativer Pfad zum
   Vorschaubild, siehe unten), `status` (Freitext-Badge, siehe unten).
 - **Vorschaubild fürs Dashboard:** nach dem ersten Deploy die live-Seite per
-  Browser-Screenshot festhalten und als `artefakte/<slug>/preview.png`
-  committen; `previewImage` im Firestore-Dokument auf `<slug>/preview.png`
-  setzen. Ohne `previewImage` zeigt die Karte nur den Titel statt eines Bilds.
+  Browser-Screenshot festhalten und als `artefakte/<slug>/preview.<ext>`
+  committen (Format egal, meist `.jpg` vom Screenshot-Tool); `previewImage`
+  im Firestore-Dokument auf `<slug>/preview.<ext>` setzen. Ohne `previewImage`
+  zeigt die Karte nur den Titel statt eines Bilds.
 - **Status-Badge:** Freitext, kein festes Enum. Wird direkt im Dashboard
   gepflegt (Klick auf den Badge öffnet Auswahl bereits verwendeter Werte +
   Freitextfeld) — der Export-Skill muss hier i.d.R. nichts setzen.
