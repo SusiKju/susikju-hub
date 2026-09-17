@@ -334,25 +334,37 @@
 
   .history-empty { color: var(--muted); font-size: .88rem; }
   .history-list { display: flex; flex-direction: column; gap: .1rem; max-height: 55vh; overflow: auto; }
+  /* Zwei Zeilen statt einer einzigen Flex-Reihe — auf schmalen Bildschirmen
+     quetschten sich sonst Werte und Aktionen/Bestätigung ineinander (siehe
+     Screenshot-Feedback: 3-zeilig umgebrochener Wert neben "Wirklich
+     löschen?" auf Handybreite). */
   .history-row {
-    display: flex; align-items: center; gap: .7rem;
-    padding: .55rem 0; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: .35rem;
+    padding: .6rem 0; border-bottom: 1px solid var(--border);
     font-size: .85rem;
   }
-  .history-row .dot { flex: 0 0 auto; }
-  .history-row .hr-kid { font-weight: 600; min-width: 52px; }
-  .history-row .hr-date { color: var(--text-secondary); min-width: 78px; font-variant-numeric: tabular-nums; }
-  .history-row .hr-values { flex: 1; font-variant-numeric: tabular-nums; }
-  .history-row .hr-actions { display: flex; gap: .4rem; flex: 0 0 auto; }
-  .history-row .hr-actions button {
+  .hr-top { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .hr-top .dot { flex: 0 0 auto; }
+  .hr-kid { font-weight: 600; }
+  .hr-date { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .hr-bottom { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+  .hr-values { font-variant-numeric: tabular-nums; }
+  .hr-actions { display: flex; gap: .4rem; flex: 0 0 auto; }
+  .hr-actions button {
     font: inherit; font-size: .78rem; padding: .3rem .55rem; border-radius: 6px; cursor: pointer;
+    white-space: nowrap;
   }
   .hr-edit { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
   .hr-edit:hover { color: var(--text-primary); }
   .hr-delete { background: transparent; border: 1px solid #c23b3b; color: #c23b3b; }
   .hr-delete:hover { background: #c23b3b; color: #fff; }
-  .hr-confirm { display: flex; align-items: center; gap: .5rem; flex: 1; font-size: .82rem; color: #c23b3b; }
-  .hr-confirm button { font: inherit; font-size: .78rem; padding: .3rem .55rem; border-radius: 6px; cursor: pointer; }
+  .hr-confirm {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    font-size: .82rem; color: #c23b3b; width: 100%; justify-content: space-between;
+  }
+  .hr-confirm button {
+    font: inherit; font-size: .78rem; padding: .3rem .55rem; border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
   .hr-confirm-yes { background: #c23b3b; border: none; color: #fff; }
   .hr-confirm-no { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
 </style>
@@ -866,14 +878,18 @@ const ARTEFAKT_ID = "wachstumskurven";
       ].filter(Boolean).join(' · ');
 
       row.innerHTML = `
-        <span class="dot" style="width:9px;height:9px;border-radius:50%;background:var(${kidMeta.varName})"></span>
-        <span class="hr-kid">${entry.kid}</span>
-        <span class="hr-date">${entry.d.split('-').reverse().join('.')}</span>
-        <span class="hr-values">${valuesText}</span>
-        <span class="hr-actions">
-          <button type="button" class="hr-edit">Bearbeiten</button>
-          <button type="button" class="hr-delete">Löschen</button>
-        </span>`;
+        <div class="hr-top">
+          <span class="dot" style="width:9px;height:9px;border-radius:50%;background:var(${kidMeta.varName})"></span>
+          <span class="hr-kid">${entry.kid}</span>
+          <span class="hr-date">${entry.d.split('-').reverse().join('.')}</span>
+        </div>
+        <div class="hr-bottom">
+          <span class="hr-values">${valuesText}</span>
+          <span class="hr-actions">
+            <button type="button" class="hr-edit">Bearbeiten</button>
+            <button type="button" class="hr-delete">Löschen</button>
+          </span>
+        </div>`;
 
       row.querySelector('.hr-edit').addEventListener('click', () => {
         historyBackdrop.hidden = true;
@@ -881,13 +897,19 @@ const ARTEFAKT_ID = "wachstumskurven";
       });
 
       row.querySelector('.hr-delete').addEventListener('click', () => {
-        const actions = row.querySelector('.hr-actions');
-        actions.innerHTML = `
+        // Ersetzt die ganze Zeile (Werte + Aktionen), nicht nur die Buttons —
+        // sonst quetscht sich "Wirklich löschen?" neben die Werte statt die
+        // volle Zeilenbreite zu bekommen.
+        const bottom = row.querySelector('.hr-bottom');
+        bottom.innerHTML = `
           <span class="hr-confirm">
             Wirklich löschen?
-            <button type="button" class="hr-confirm-yes">Ja</button>
-            <button type="button" class="hr-confirm-no">Nein</button>
+            <span style="display:flex; gap:.4rem;">
+              <button type="button" class="hr-confirm-yes">Ja</button>
+              <button type="button" class="hr-confirm-no">Nein</button>
+            </span>
           </span>`;
+        const actions = bottom;
         actions.querySelector('.hr-confirm-no').addEventListener('click', () => renderHistory());
         actions.querySelector('.hr-confirm-yes').addEventListener('click', async () => {
           removeManualPoint(entry.kid, entry.d);
