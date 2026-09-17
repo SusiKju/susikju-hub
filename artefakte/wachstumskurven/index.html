@@ -121,6 +121,7 @@
   .modal {
     position: relative;
     width: min(420px, 100%);
+    min-width: 0;
     max-height: 88vh;
     overflow: auto;
     background: var(--surface-1);
@@ -141,9 +142,10 @@
     color: var(--muted); cursor: pointer; padding: 6px;
   }
   .modal-close:hover { color: var(--text-primary); }
-  .field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .9rem; }
+  .field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .9rem; min-width: 0; }
   .field label { font-size: .78rem; color: var(--text-secondary); font-weight: 600; }
   .field input, .field select {
+    width: 100%;
     font: inherit; font-size: .95rem;
     padding: .5rem .6rem;
     border-radius: 8px;
@@ -152,7 +154,7 @@
     color: var(--text-primary);
   }
   .field-row { display: flex; gap: .8rem; }
-  .field-row .field { flex: 1; }
+  .field-row .field { flex: 1; min-width: 0; }
   .field-error {
     color: #c23b3b; font-size: .82rem; margin: -.3rem 0 .8rem;
   }
