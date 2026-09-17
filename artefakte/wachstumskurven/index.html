@@ -322,6 +322,39 @@
     border-top: 1px solid var(--border);
     padding-top: 1.25rem;
   }
+
+  .btn-link {
+    align-self: flex-start;
+    background: none; border: none; padding: 0;
+    font: inherit; font-size: .82rem; color: var(--text-secondary);
+    text-decoration: underline; cursor: pointer;
+  }
+  .btn-link:hover { color: var(--text-primary); }
+  .header-actions-row { display: flex; align-items: center; gap: 1rem; margin-top: .4rem; }
+
+  .history-empty { color: var(--muted); font-size: .88rem; }
+  .history-list { display: flex; flex-direction: column; gap: .1rem; max-height: 55vh; overflow: auto; }
+  .history-row {
+    display: flex; align-items: center; gap: .7rem;
+    padding: .55rem 0; border-bottom: 1px solid var(--border);
+    font-size: .85rem;
+  }
+  .history-row .dot { flex: 0 0 auto; }
+  .history-row .hr-kid { font-weight: 600; min-width: 52px; }
+  .history-row .hr-date { color: var(--text-secondary); min-width: 78px; font-variant-numeric: tabular-nums; }
+  .history-row .hr-values { flex: 1; font-variant-numeric: tabular-nums; }
+  .history-row .hr-actions { display: flex; gap: .4rem; flex: 0 0 auto; }
+  .history-row .hr-actions button {
+    font: inherit; font-size: .78rem; padding: .3rem .55rem; border-radius: 6px; cursor: pointer;
+  }
+  .hr-edit { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+  .hr-edit:hover { color: var(--text-primary); }
+  .hr-delete { background: transparent; border: 1px solid #c23b3b; color: #c23b3b; }
+  .hr-delete:hover { background: #c23b3b; color: #fff; }
+  .hr-confirm { display: flex; align-items: center; gap: .5rem; flex: 1; font-size: .82rem; color: #c23b3b; }
+  .hr-confirm button { font: inherit; font-size: .78rem; padding: .3rem .55rem; border-radius: 6px; cursor: pointer; }
+  .hr-confirm-yes { background: #c23b3b; border: none; color: #fff; }
+  .hr-confirm-no { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
 </style>
 
 <div class="page">
@@ -332,7 +365,10 @@
       Größe und Gewicht von Lenny, Emil, Hannes und Liddy im direkten Altersvergleich –
       jede Linie endet ehrlich beim letzten tatsächlichen Messwert des jeweiligen Kindes.
     </p>
-    <button type="button" class="btn-add" id="open-add-measurement">+ Messwert erfassen</button>
+    <div class="header-actions-row">
+      <button type="button" class="btn-add" id="open-add-measurement">+ Messwert erfassen</button>
+      <button type="button" class="btn-link" id="open-history">Verlauf manueller Einträge</button>
+    </div>
   </header>
 
   <section class="stat-grid" id="stat-grid" aria-label="Aktuellster Messwert je Kind"></section>
@@ -436,6 +472,18 @@
         <button type="button" class="btn-primary" id="add-close-done">Fertig</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="history-modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+    <button type="button" class="modal-close" id="history-modal-close" aria-label="Schließen">✕</button>
+    <h2 id="history-modal-title">Verlauf manueller Einträge</h2>
+    <p class="field-note" style="margin: -.5rem 0 .9rem;">
+      Nur Messwerte, die über "+ Messwert erfassen" eingegeben wurden — die ursprünglich
+      importierten historischen Daten stehen nicht hier, sondern unter "Rohdaten anzeigen".
+    </p>
+    <div id="history-list"></div>
   </div>
 </div>
 
@@ -661,13 +709,18 @@ const ARTEFAKT_ID = "wachstumskurven";
   const warningEl = document.getElementById('add-warning');
   const summaryEl = document.getElementById('add-summary');
 
+  const modalTitleEl = document.getElementById('add-modal-title');
   let pendingEntry = null; // { kid, dateIso, ageYears, heightVal, weightVal }
+  let editingOriginal = null; // { kid, d } des Punkts, der beim Speichern ersetzt wird — null = echter Neueintrag
 
-  function openModal() {
-    dateInput.value = HEUTE_ISO;
+  function openModal(prefill) {
+    editingOriginal = prefill ? { kid: prefill.kid, d: prefill.d } : null;
+    modalTitleEl.textContent = prefill ? 'Messwert bearbeiten' : 'Neuer Messwert';
+    kidSelect.value = prefill ? prefill.kid : kidSelect.value;
+    dateInput.value = prefill ? prefill.d : HEUTE_ISO;
     dateInput.max = HEUTE_ISO;
-    heightInput.value = '';
-    weightInput.value = '';
+    heightInput.value = prefill && prefill.heightVal !== null ? prefill.heightVal : '';
+    weightInput.value = prefill && prefill.weightVal !== null ? prefill.weightVal : '';
     errorEl.hidden = true;
     stepForm.hidden = false;
     stepConfirm.hidden = true;
@@ -676,7 +729,7 @@ const ARTEFAKT_ID = "wachstumskurven";
   }
   function closeModal() { backdrop.hidden = true; }
 
-  document.getElementById('open-add-measurement').addEventListener('click', openModal);
+  document.getElementById('open-add-measurement').addEventListener('click', () => openModal(null));
   document.getElementById('add-modal-close').addEventListener('click', closeModal);
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
 
@@ -702,16 +755,19 @@ const ARTEFAKT_ID = "wachstumskurven";
     const parts = [`<b>${kid}</b>, ${dateIso.split('-').reverse().join('.')} (Alter ${fmt(ageYears)} J.)`];
     if (heightVal !== null) parts.push(`Größe: <b>${fmt(heightVal)} cm</b>`);
     if (weightVal !== null) parts.push(`Gewicht: <b>${fmt(weightVal, 2)} kg</b>`);
+    if (editingOriginal) parts.push(`<span style="color:var(--muted)">(ersetzt bisherigen Eintrag: ${editingOriginal.kid}, ${editingOriginal.d.split('-').reverse().join('.')})</span>`);
     summaryEl.innerHTML = parts.join('<br>');
 
     // Plausibilitäts-Hinweis: großer Sprung zum letzten bekannten Wert? Nur Warnung, kein Blocker.
+    // Beim Bearbeiten den bisherigen eigenen Stand als Vergleichswert ignorieren, sonst
+    // vergleicht man den Eintrag am Ende mit sich selbst.
     const warnings = [];
     const lastH = lastPoint(heightData, kid);
-    if (heightVal !== null && lastH && Math.abs(heightVal - lastH[1]) > 15) {
+    if (heightVal !== null && lastH && !(editingOriginal && editingOriginal.kid === kid) && Math.abs(heightVal - lastH[1]) > 15) {
       warnings.push(`Größe weicht um ${fmt(Math.abs(heightVal - lastH[1]))} cm vom letzten Wert (${fmt(lastH[1])} cm) ab.`);
     }
     const lastW = lastPoint(weightData, kid);
-    if (weightVal !== null && lastW && Math.abs(weightVal - lastW[1]) > 8) {
+    if (weightVal !== null && lastW && !(editingOriginal && editingOriginal.kid === kid) && Math.abs(weightVal - lastW[1]) > 8) {
       warnings.push(`Gewicht weicht um ${fmt(Math.abs(weightVal - lastW[1]), 2)} kg vom letzten Wert (${fmt(lastW[1], 2)} kg) ab.`);
     }
     if (warnings.length) {
@@ -730,14 +786,28 @@ const ARTEFAKT_ID = "wachstumskurven";
     stepForm.hidden = false;
   });
 
+  // Entfernt alle Punkte von <kid> am Datum <d> aus heightData/weightData (in-memory,
+  // data.* wird danach per updateDoc geschrieben) — genutzt sowohl beim Bearbeiten
+  // (alten Eintrag ersetzen) als auch beim Löschen.
+  function removeManualPoint(kid, d) {
+    data.heightData[kid] = data.heightData[kid].filter((p) => p.d !== d);
+    data.weightData[kid] = data.weightData[kid].filter((p) => p.d !== d);
+  }
+  async function writeBack() {
+    await updateDoc(doc(db, "artefakte", ARTEFAKT_ID), {
+      heightData: data.heightData, weightData: data.weightData, updatedAt: new Date().toISOString(),
+    });
+  }
+
   document.getElementById('add-save').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     try {
       const { kid, dateIso, ageYears, heightVal, weightVal } = pendingEntry;
+      if (editingOriginal) removeManualPoint(editingOriginal.kid, editingOriginal.d);
       if (heightVal !== null) data.heightData[kid].push({ d: dateIso, a: ageYears, v: heightVal });
       if (weightVal !== null) data.weightData[kid].push({ d: dateIso, a: ageYears, v: weightVal });
-      await updateDoc(doc(db, "artefakte", ARTEFAKT_ID), { heightData: data.heightData, weightData: data.weightData, updatedAt: new Date().toISOString() });
+      await writeBack();
       stepConfirm.hidden = true;
       stepDone.hidden = false;
     } catch (err) {
@@ -750,6 +820,93 @@ const ARTEFAKT_ID = "wachstumskurven";
   });
 
   document.getElementById('add-close-done').addEventListener('click', () => location.reload());
+
+  // ---- Verlauf manueller Einträge: bearbeiten/löschen ----
+  const historyBackdrop = document.getElementById('history-modal-backdrop');
+  const historyList = document.getElementById('history-list');
+
+  function manualEntries() {
+    // Ein Eintrag = (Kind, Datum) — Größe/Gewicht desselben Tages gehören zusammen,
+    // auch wenn sie als getrennte Punkte in heightData/weightData liegen.
+    const byKey = new Map();
+    for (const kid of KIDS.map((k) => k.key)) {
+      for (const p of data.heightData[kid] ?? []) {
+        if (!p.d) continue;
+        const key = kid + '|' + p.d;
+        if (!byKey.has(key)) byKey.set(key, { kid, d: p.d, heightVal: null, weightVal: null });
+        byKey.get(key).heightVal = p.v;
+      }
+      for (const p of data.weightData[kid] ?? []) {
+        if (!p.d) continue;
+        const key = kid + '|' + p.d;
+        if (!byKey.has(key)) byKey.set(key, { kid, d: p.d, heightVal: null, weightVal: null });
+        byKey.get(key).weightVal = p.v;
+      }
+    }
+    return [...byKey.values()].sort((a, b) => b.d.localeCompare(a.d));
+  }
+
+  function renderHistory() {
+    const entries = manualEntries();
+    if (!entries.length) {
+      historyList.innerHTML = '<p class="history-empty">Noch keine manuell erfassten Messwerte.</p>';
+      return;
+    }
+    historyList.innerHTML = '';
+    const list = document.createElement('div');
+    list.className = 'history-list';
+    for (const entry of entries) {
+      const kidMeta = KIDS.find((k) => k.key === entry.kid);
+      const row = document.createElement('div');
+      row.className = 'history-row';
+
+      const valuesText = [
+        entry.heightVal !== null ? `${fmt(entry.heightVal)} cm` : null,
+        entry.weightVal !== null ? `${fmt(entry.weightVal, 2)} kg` : null,
+      ].filter(Boolean).join(' · ');
+
+      row.innerHTML = `
+        <span class="dot" style="width:9px;height:9px;border-radius:50%;background:var(${kidMeta.varName})"></span>
+        <span class="hr-kid">${entry.kid}</span>
+        <span class="hr-date">${entry.d.split('-').reverse().join('.')}</span>
+        <span class="hr-values">${valuesText}</span>
+        <span class="hr-actions">
+          <button type="button" class="hr-edit">Bearbeiten</button>
+          <button type="button" class="hr-delete">Löschen</button>
+        </span>`;
+
+      row.querySelector('.hr-edit').addEventListener('click', () => {
+        historyBackdrop.hidden = true;
+        openModal(entry);
+      });
+
+      row.querySelector('.hr-delete').addEventListener('click', () => {
+        const actions = row.querySelector('.hr-actions');
+        actions.innerHTML = `
+          <span class="hr-confirm">
+            Wirklich löschen?
+            <button type="button" class="hr-confirm-yes">Ja</button>
+            <button type="button" class="hr-confirm-no">Nein</button>
+          </span>`;
+        actions.querySelector('.hr-confirm-no').addEventListener('click', () => renderHistory());
+        actions.querySelector('.hr-confirm-yes').addEventListener('click', async () => {
+          removeManualPoint(entry.kid, entry.d);
+          await writeBack();
+          location.reload();
+        });
+      });
+
+      list.appendChild(row);
+    }
+    historyList.appendChild(list);
+  }
+
+  document.getElementById('open-history').addEventListener('click', () => {
+    renderHistory();
+    historyBackdrop.hidden = false;
+  });
+  document.getElementById('history-modal-close').addEventListener('click', () => { historyBackdrop.hidden = true; });
+  historyBackdrop.addEventListener('click', (e) => { if (e.target === historyBackdrop) historyBackdrop.hidden = true; });
 })();
 </script>
 
