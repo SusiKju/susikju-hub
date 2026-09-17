@@ -179,7 +179,7 @@
 
   .stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
     gap: 1rem;
   }
   .stat-card {
@@ -217,7 +217,7 @@
 
   .charts {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
     gap: 1.5rem;
   }
   .chart-card {
