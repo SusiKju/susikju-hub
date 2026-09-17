@@ -98,6 +98,83 @@
     line-height: 1.55;
   }
 
+  .btn-add {
+    align-self: flex-start;
+    margin-top: .4rem;
+    background: var(--text-primary);
+    color: var(--page-bg);
+    border: none;
+    border-radius: 8px;
+    padding: .55rem 1rem;
+    font: inherit;
+    font-weight: 600;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  .btn-add:hover { opacity: .88; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 50;
+  }
+  .modal {
+    position: relative;
+    width: min(420px, 100%);
+    max-height: 88vh;
+    overflow: auto;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.6rem 1.6rem 1.4rem;
+    box-shadow: 0 30px 70px var(--shadow);
+  }
+  .modal h2 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 1.25rem;
+    margin: 0 0 1rem;
+  }
+  .modal-close {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: none; font-size: 1.1rem;
+    color: var(--muted); cursor: pointer; padding: 6px;
+  }
+  .modal-close:hover { color: var(--text-primary); }
+  .field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .9rem; }
+  .field label { font-size: .78rem; color: var(--text-secondary); font-weight: 600; }
+  .field input, .field select {
+    font: inherit; font-size: .95rem;
+    padding: .5rem .6rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--page-bg);
+    color: var(--text-primary);
+  }
+  .field-row { display: flex; gap: .8rem; }
+  .field-row .field { flex: 1; }
+  .field-error {
+    color: #c23b3b; font-size: .82rem; margin: -.3rem 0 .8rem;
+  }
+  .field-warning {
+    color: #a5690a; font-size: .82rem;
+    background: color-mix(in srgb, #eda100 14%, transparent);
+    border-radius: 8px; padding: .6rem .7rem; margin: 0 0 .9rem;
+  }
+  .field-note { color: var(--muted); font-size: .78rem; }
+  .confirm-summary {
+    font-size: .92rem; line-height: 1.6; margin-bottom: .9rem;
+  }
+  .confirm-summary b { font-variant-numeric: tabular-nums; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .4rem; }
+  .btn-primary, .btn-secondary {
+    font: inherit; font-weight: 600; font-size: .85rem;
+    padding: .55rem 1rem; border-radius: 8px; cursor: pointer;
+  }
+  .btn-primary { background: var(--text-primary); color: var(--page-bg); border: none; }
+  .btn-primary:hover { opacity: .88; }
+  .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -255,6 +332,7 @@
       Größe und Gewicht von Lenny, Emil, Hannes und Liddy im direkten Altersvergleich –
       jede Linie endet ehrlich beim letzten tatsächlichen Messwert des jeweiligen Kindes.
     </p>
+    <button type="button" class="btn-add" id="open-add-measurement">+ Messwert erfassen</button>
   </header>
 
   <section class="stat-grid" id="stat-grid" aria-label="Aktuellster Messwert je Kind"></section>
@@ -305,10 +383,66 @@
   </footer>
 </div>
 
+<div class="modal-backdrop" id="add-modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
+    <button type="button" class="modal-close" id="add-modal-close" aria-label="Schließen">✕</button>
+
+    <div id="add-step-form">
+      <h2 id="add-modal-title">Neuer Messwert</h2>
+      <div class="field">
+        <label for="add-kid">Kind</label>
+        <select id="add-kid">
+          <option value="Lenny">Lenny</option>
+          <option value="Emil">Emil</option>
+          <option value="Hannes">Hannes</option>
+          <option value="Liddy">Liddy</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="add-date">Datum</label>
+        <input type="date" id="add-date">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="add-height">Größe (cm)</label>
+          <input type="number" id="add-height" step="0.1" placeholder="z. B. 158">
+        </div>
+        <div class="field">
+          <label for="add-weight">Gewicht (kg)</label>
+          <input type="number" id="add-weight" step="0.01" placeholder="z. B. 42">
+        </div>
+      </div>
+      <p class="field-error" id="add-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" id="add-continue">Weiter</button>
+      </div>
+    </div>
+
+    <div id="add-step-confirm" hidden>
+      <h2>Bitte prüfen</h2>
+      <div class="confirm-summary" id="add-summary"></div>
+      <p class="field-warning" id="add-warning" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="add-back">Zurück</button>
+        <button type="button" class="btn-primary" id="add-save">Speichern</button>
+      </div>
+    </div>
+
+    <div id="add-step-done" hidden>
+      <h2>Gespeichert</h2>
+      <p>Der neue Messwert ist in den Diagrammen oben aktualisiert.</p>
+      <p class="field-note">Nicht vergessen: <code>sync-wachstumskurven-to-wissensdatenbank.mjs</code> lokal ausführen, damit der Wert auch in <code>familie/wachstumsstatistik.md</code> landet.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" id="add-close-done">Fertig</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { schuetzeSeite } from "../../js/guard.js";
 import { db } from "../../js/auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 const ARTEFAKT_ID = "wachstumskurven";
 
@@ -498,6 +632,124 @@ const ARTEFAKT_ID = "wachstumskurven";
 
   buildChart({ svgId: 'chart-height', tooltipId: 'tooltip-height', dataset: heightData, yMin: 40, yMax: 165, yTicks: [40, 60, 80, 100, 120, 140, 160], unit: 'cm', decimals: 1 });
   buildChart({ svgId: 'chart-weight', tooltipId: 'tooltip-weight', dataset: weightData, yMin: 0, yMax: 45, yTicks: [0, 10, 20, 30, 40], unit: 'kg', decimals: 2 });
+
+  // ---- Neuer Messwert: Formular, Plausibilitätsprüfung, Bestätigung ----
+  // Geburtsdaten wie in scripts/sync-wachstumskurven-to-wissensdatenbank.mjs —
+  // bei Änderung dort auch hier nachziehen.
+  const GEBURTSDATUM = {
+    Lenny: '2013-09-21', Emil: '2016-10-18', Hannes: '2019-02-21', Liddy: '2022-02-25',
+  };
+  const HEUTE_ISO = new Date().toISOString().slice(0, 10);
+
+  function ageYearsBetween(birthIso, dateIso) {
+    return Math.round(((new Date(dateIso) - new Date(birthIso)) / 86400000 / 365.2425) * 10) / 10;
+  }
+  function lastPoint(dataset, kid) {
+    const pts = dataset[kid];
+    return pts.length ? pts[pts.length - 1] : null;
+  }
+
+  const backdrop = document.getElementById('add-modal-backdrop');
+  const stepForm = document.getElementById('add-step-form');
+  const stepConfirm = document.getElementById('add-step-confirm');
+  const stepDone = document.getElementById('add-step-done');
+  const kidSelect = document.getElementById('add-kid');
+  const dateInput = document.getElementById('add-date');
+  const heightInput = document.getElementById('add-height');
+  const weightInput = document.getElementById('add-weight');
+  const errorEl = document.getElementById('add-error');
+  const warningEl = document.getElementById('add-warning');
+  const summaryEl = document.getElementById('add-summary');
+
+  let pendingEntry = null; // { kid, dateIso, ageYears, heightVal, weightVal }
+
+  function openModal() {
+    dateInput.value = HEUTE_ISO;
+    dateInput.max = HEUTE_ISO;
+    heightInput.value = '';
+    weightInput.value = '';
+    errorEl.hidden = true;
+    stepForm.hidden = false;
+    stepConfirm.hidden = true;
+    stepDone.hidden = true;
+    backdrop.hidden = false;
+  }
+  function closeModal() { backdrop.hidden = true; }
+
+  document.getElementById('open-add-measurement').addEventListener('click', openModal);
+  document.getElementById('add-modal-close').addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+
+  document.getElementById('add-continue').addEventListener('click', () => {
+    const kid = kidSelect.value;
+    const dateIso = dateInput.value;
+    const heightVal = heightInput.value.trim() === '' ? null : parseFloat(heightInput.value);
+    const weightVal = weightInput.value.trim() === '' ? null : parseFloat(weightInput.value);
+
+    const fail = (msg) => { errorEl.textContent = msg; errorEl.hidden = false; };
+    errorEl.hidden = true;
+
+    if (!dateIso) return fail('Bitte ein Datum angeben.');
+    if (dateIso < GEBURTSDATUM[kid]) return fail(`Datum liegt vor ${kid}s Geburtsdatum (${GEBURTSDATUM[kid]}).`);
+    if (dateIso > HEUTE_ISO) return fail('Datum darf nicht in der Zukunft liegen.');
+    if (heightVal === null && weightVal === null) return fail('Bitte Größe und/oder Gewicht angeben.');
+    if (heightVal !== null && (heightVal < 30 || heightVal > 200)) return fail('Größe wirkt unplausibel (erwartet: 30–200 cm).');
+    if (weightVal !== null && (weightVal < 2 || weightVal > 100)) return fail('Gewicht wirkt unplausibel (erwartet: 2–100 kg).');
+
+    const ageYears = ageYearsBetween(GEBURTSDATUM[kid], dateIso);
+    pendingEntry = { kid, dateIso, ageYears, heightVal, weightVal };
+
+    const parts = [`<b>${kid}</b>, ${dateIso.split('-').reverse().join('.')} (Alter ${fmt(ageYears)} J.)`];
+    if (heightVal !== null) parts.push(`Größe: <b>${fmt(heightVal)} cm</b>`);
+    if (weightVal !== null) parts.push(`Gewicht: <b>${fmt(weightVal, 2)} kg</b>`);
+    summaryEl.innerHTML = parts.join('<br>');
+
+    // Plausibilitäts-Hinweis: großer Sprung zum letzten bekannten Wert? Nur Warnung, kein Blocker.
+    const warnings = [];
+    const lastH = lastPoint(heightData, kid);
+    if (heightVal !== null && lastH && Math.abs(heightVal - lastH[1]) > 15) {
+      warnings.push(`Größe weicht um ${fmt(Math.abs(heightVal - lastH[1]))} cm vom letzten Wert (${fmt(lastH[1])} cm) ab.`);
+    }
+    const lastW = lastPoint(weightData, kid);
+    if (weightVal !== null && lastW && Math.abs(weightVal - lastW[1]) > 8) {
+      warnings.push(`Gewicht weicht um ${fmt(Math.abs(weightVal - lastW[1]), 2)} kg vom letzten Wert (${fmt(lastW[1], 2)} kg) ab.`);
+    }
+    if (warnings.length) {
+      warningEl.innerHTML = '⚠ ' + warnings.join(' ');
+      warningEl.hidden = false;
+    } else {
+      warningEl.hidden = true;
+    }
+
+    stepForm.hidden = true;
+    stepConfirm.hidden = false;
+  });
+
+  document.getElementById('add-back').addEventListener('click', () => {
+    stepConfirm.hidden = true;
+    stepForm.hidden = false;
+  });
+
+  document.getElementById('add-save').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const { kid, dateIso, ageYears, heightVal, weightVal } = pendingEntry;
+      if (heightVal !== null) data.heightData[kid].push({ d: dateIso, a: ageYears, v: heightVal });
+      if (weightVal !== null) data.weightData[kid].push({ d: dateIso, a: ageYears, v: weightVal });
+      await updateDoc(doc(db, "artefakte", ARTEFAKT_ID), { heightData: data.heightData, weightData: data.weightData, updatedAt: new Date().toISOString() });
+      stepConfirm.hidden = true;
+      stepDone.hidden = false;
+    } catch (err) {
+      btn.disabled = false;
+      stepConfirm.hidden = true;
+      stepForm.hidden = false;
+      errorEl.textContent = 'Speichern fehlgeschlagen: ' + err.message;
+      errorEl.hidden = false;
+    }
+  });
+
+  document.getElementById('add-close-done').addEventListener('click', () => location.reload());
 })();
 </script>
 
