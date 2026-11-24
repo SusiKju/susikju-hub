@@ -317,6 +317,14 @@
     cursor:pointer; border:1.5px solid #d9a520; background:transparent; color:#8a6416;
   }
   .fav-btn.active{ background:#ffcb3d; border-color:transparent; color:#4a3400; }
+  .kauf-field{
+    margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--paper-soft);
+  }
+  .kauf-field input{
+    font:inherit; font-size:.85rem; text-transform:none; letter-spacing:0; color:var(--paper-ink);
+    background:transparent; border:1.5px solid var(--paper-accent); border-radius:8px; padding:6px 8px; min-width:0;
+  }
 
   footer{ text-align:center; color:var(--text-faint); font-size:.72rem; padding-top:26px; }
   footer a{ color:var(--text-soft); }
@@ -557,6 +565,9 @@
               <button class="fav-btn ${b.favorite ? "active" : ""}" data-toggle-fav="1">
                 ${b.favorite ? "★ Favorit" : "☆ Als Favorit markieren"}
               </button>
+              <label class="kauf-field">Gekauft am
+                <input type="date" id="kaufdatum-input" value="${kaufdatumToIso(b.kaufdatum)}">
+              </label>
             </div>
           </div>
         </div>
@@ -573,6 +584,27 @@
     const b = findBook(id);
     if (!b) return;
     b.status = status;
+    renderShelves(); renderModal();
+    saveBook(b);
+  }
+
+  // kaufdatum bleibt im bisherigen Format TT.MM.JJJJ (Sync-Skript + Markdown erwarten das);
+  // <input type="date"> braucht JJJJ-MM-TT.
+  function kaufdatumToIso(d){
+    const p = (d || "").split(".");
+    return p.length === 3 ? `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}` : "";
+  }
+
+  function setKaufdatum(id, iso){
+    const b = findBook(id);
+    if (!b) return;
+    if (iso){
+      const [y, m, d] = iso.split("-");
+      b.kaufdatum = `${d}.${m}.${y}`;
+      if (b.status === "tobuy") b.status = "unread"; // Kaufdatum gesetzt = gekauft
+    } else {
+      delete b.kaufdatum;
+    }
     renderShelves(); renderModal();
     saveBook(b);
   }
@@ -612,6 +644,10 @@
     if (statusBtn){ setStatus(openBookId, statusBtn.dataset.status); return; }
     if (e.target.closest("[data-toggle-fav]")){ toggleFavorite(openBookId); return; }
     if (e.target.closest("[data-close]") === e.target || e.target.dataset.close){ openBookId = null; renderModal(); }
+  });
+
+  document.getElementById("modalRoot").addEventListener("change", e => {
+    if (e.target.id === "kaufdatum-input") setKaufdatum(openBookId, e.target.value);
   });
 
   window.addEventListener("keydown", e => {
