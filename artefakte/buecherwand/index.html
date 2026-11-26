@@ -65,45 +65,40 @@
   .chip[data-status="read"].active{ background:var(--status-read); border-color:var(--status-read); color:#0c1410; }
   .chip[data-status="tobuy"].active{ background:var(--status-tobuy); border-color:var(--status-tobuy); color:#04122c; }
 
-  /* ---- pinned focus row: a small, quiet strip up top — currently-reading and
-     not-yet-purchased books side by side, always visible regardless of the wall
-     below. Deliberately smaller/quieter than the wall itself, not bigger. ---- */
-  #reading-focus:empty{ display:none; }
-  #reading-focus .focus-top{
-    display:flex; align-items:stretch; flex-wrap:wrap;
-    margin: 0 -14px 14px; border-bottom:1px solid var(--line);
+  /* ---- Leseliste "Als Nächstes": eigene, manuell sortierte Pipeline (Firestore-Feld
+     nextUp = Liste von Buch-IDs). Vorne die gerade gelesenen Bücher als "Jetzt",
+     dahinter die Warteschlange mit Platznummer und ‹ › ✕ zum Umsortieren. ---- */
+  #pipeline{ margin: 0 0 22px; }
+  .pl-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .pl-head h2{ font-family:"Literata",serif; font-size:1rem; font-weight:600; margin:0; }
+  .pl-head .pl-hint{ font-size:.72rem; color:var(--text-faint); }
+  .pl-row{ display:flex; align-items:flex-start; gap:10px; overflow-x:auto; padding:4px 2px 6px; }
+  .pl-item{ flex:0 0 auto; width: clamp(64px, 8vw, 84px); display:flex; flex-direction:column; gap:5px; }
+  .pl-cover{ position:relative; border:none; padding:0; background:none; cursor:pointer; width:100%; }
+  .pl-cover img, .pl-cover .ci-fallback{ width:100%; aspect-ratio:2/3; object-fit:cover; display:flex; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,.5); }
+  .pl-num{
+    position:absolute; top:-6px; left:-6px; width:22px; height:22px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:800;
+    background:var(--focus); color:#2c2416; box-shadow:0 2px 6px rgba(0,0,0,.6);
   }
-  #reading-focus .focus-panel{
-    display:flex; flex-direction:column; padding:6px 12px 9px; min-width:0;
+  .pl-item.now .pl-num{ background:var(--status-reading); width:auto; padding:0 6px; border-radius:999px; font-size:.6rem; }
+  .pl-item.tobuy .pl-cover img{ filter:grayscale(100%); opacity:.6; outline:2px dashed var(--status-tobuy); outline-offset:2px; }
+  .pl-title{ font-size:.64rem; line-height:1.25; color:var(--text-soft); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .pl-ctrl{ display:flex; gap:3px; }
+  .pl-ctrl button{
+    flex:1 1 0; min-height:28px; font-size:.8rem; color:var(--text-soft); background:var(--ground-2);
+    border:1px solid var(--line); border-radius:6px; cursor:pointer; padding:0;
   }
-  #reading-focus .focus-panel + .focus-panel{ border-left:1px solid var(--line); }
-  #reading-focus .focus-panel.reading{
-    background: linear-gradient(180deg, color-mix(in srgb, var(--status-reading) 7%, transparent), transparent);
+  .pl-ctrl button:hover:not(:disabled){ color:var(--text); border-color:var(--text-soft); }
+  .pl-ctrl button:disabled{ opacity:.3; cursor:default; }
+  .pl-sep{ align-self:center; color:var(--text-faint); font-size:1.2rem; padding-bottom:30px; }
+  .pl-empty{ font-size:.8rem; color:var(--text-faint); font-style:italic; align-self:center; }
+  .chip .n{ opacity:.65; margin-left:4px; font-variant-numeric:tabular-nums; }
+  .queue-btn{
+    margin-top:8px; width:100%; border-radius:8px; padding:9px 10px; font-weight:700; font-size:.8rem;
+    cursor:pointer; border:1.5px solid var(--paper-accent); background:transparent; color:var(--paper-accent-ink);
   }
-  #reading-focus .focus-panel.tobuy{
-    background: linear-gradient(180deg, color-mix(in srgb, var(--status-tobuy) 7%, transparent), transparent);
-  }
-  #reading-focus .focus-panel.unread{
-    background: linear-gradient(180deg, color-mix(in srgb, var(--status-unread) 7%, transparent), transparent);
-  }
-  #reading-focus .rf-label{
-    font-size:.54rem; letter-spacing:.07em; text-transform:uppercase; font-weight:700;
-    margin-bottom:6px;
-  }
-  #reading-focus .focus-panel.reading .rf-label{ color: var(--status-reading); }
-  #reading-focus .focus-panel.tobuy .rf-label{ color: var(--status-tobuy); }
-  #reading-focus .focus-panel.unread .rf-label{ color: var(--status-unread); }
-  #reading-focus .rf-row{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:7px; }
-  #reading-focus .cover-item{ width: clamp(36px, 4.5vw, 50px); }
-  #reading-focus .ci-cap, #reading-focus .ci-dates{ display:none; }
-  /* No "opened book" effect up here — just the plain cover, small and calm. */
-  #reading-focus .cover-item.is-reading .ci-img{ transform:none; box-shadow:none; }
-  #reading-focus .cover-item.is-reading .ci-pages{ display:none; }
-  #reading-focus .cover-item.is-reading:hover .ci-img,
-  #reading-focus .cover-item.is-reading:focus-visible .ci-img{
-    transform: scale(1.6); transform-origin:center center;
-    box-shadow: 0 10px 20px rgba(0,0,0,.5);
-  }
+  .queue-btn.active{ background:var(--paper-accent); color:#fff; border-color:transparent; }
 
   /* ---- cover wall: rows fill up freely and wrap like text; each book carries its
      own segment of its series' colour strip, so the line simply continues wherever
@@ -344,7 +339,7 @@
     <input id="search" type="search" placeholder="Suchen…" autocomplete="off">
   </div>
 
-  <div id="reading-focus"></div>
+  <div id="pipeline"></div>
   <div id="shelves"></div>
   <footer>Wissensdatenbank Familie Redmann · komprimierte Übersicht · siehe <code>buecherbibliothek.md</code></footer>
 </div>
@@ -359,6 +354,7 @@
   const ARTEFAKT_ID = "buecherwand";
 
   let books = [];
+  let nextUp = []; // Leseliste: Buch-IDs in selbst gewählter Reihenfolge
   const shelfPalette = ["#d98a5f","#c9a15a","#5b8fb0","#7f9ed1","#a97c50","#8a6fa8","#5fa88a"];
   let shelfColor = {};
   function computeShelfColors(){
@@ -401,6 +397,11 @@
   }
   function updateFilterChipsUI(){
     document.querySelectorAll("#filters .chip").forEach(chip => {
+      const n = chip.dataset.filter === "all" ? books.length
+        : chip.dataset.fav ? books.filter(b => b.favorite).length
+        : books.filter(b => b.status === chip.dataset.status).length;
+      if (!chip.dataset.label) chip.dataset.label = chip.textContent;
+      chip.innerHTML = `${esc(chip.dataset.label)}<span class="n">${n}</span>`;
       let active;
       if (chip.dataset.filter === "all") active = !statusFilter && !favOnly;
       else if (chip.dataset.fav) active = favOnly;
@@ -480,24 +481,49 @@
     }).join("");
   }
 
-  // Pinned above everything else, independent of the search box — always answers
-  // "what am I reading right now" regardless of what the wall below is filtered to.
-  function renderReadingFocus(){
-    const el = document.getElementById("reading-focus");
+  // Leseliste: oben fest, unabhängig von Suche/Filter. "Jetzt" = gerade gelesen,
+  // danach die Warteschlange in der Reihenfolge von nextUp.
+  function renderPipeline(){
+    const el = document.getElementById("pipeline");
     const reading = books.filter(b => b.status === "reading");
-    const unread = books.filter(b => b.status === "unread");
-    const tobuy = books.filter(b => b.status === "tobuy");
-    if (!reading.length && !unread.length && !tobuy.length){ el.innerHTML = ""; return; }
-    const panel = (cls, label, list) => !list.length ? "" : `
-      <div class="focus-panel ${cls}">
-        <div class="rf-label">${label}</div>
-        <div class="rf-row">${list.map(b => coverItemHtml(b)).join("")}</div>
+    const queue = nextUp.map(findBook).filter(Boolean);
+    const item = (b, i) => {
+      const now = i == null;
+      return `<div class="pl-item${now ? " now" : ""}${b.status === "tobuy" ? " tobuy" : ""}">
+        <button class="pl-cover" data-open="${b.id}" aria-label="${esc(b.title)} aufschlagen">
+          ${coverImgOrFallback(b, "ci-fallback")}
+          <span class="pl-num">${now ? "Jetzt" : i + 1}</span>
+        </button>
+        <div class="pl-title">${esc(b.title)}</div>
+        ${now ? "" : `<div class="pl-ctrl">
+          <button data-move="-1" data-id="${b.id}" aria-label="Weiter nach vorn" ${i === 0 ? "disabled" : ""}>‹</button>
+          <button data-move="1" data-id="${b.id}" aria-label="Weiter nach hinten" ${i === queue.length - 1 ? "disabled" : ""}>›</button>
+          <button data-remove="${b.id}" aria-label="Von der Leseliste nehmen">✕</button>
+        </div>`}
       </div>`;
-    el.innerHTML = `<div class="focus-top">${panel("reading","Wird gerade gelesen",reading)}${panel("unread","Ungelesen",unread)}${panel("tobuy","Nicht gekauft",tobuy)}</div>`;
+    };
+    const sep = reading.length && queue.length ? '<span class="pl-sep" aria-hidden="true">→</span>' : "";
+    el.innerHTML = `<div class="pl-head"><h2>Als Nächstes</h2><span class="pl-hint">${queue.length} auf der Leseliste</span></div>
+      <div class="pl-row">${reading.map(b => item(b)).join("")}${sep}${queue.map(item).join("") ||
+        '<span class="pl-empty">Buch öffnen → „Auf die Leseliste“ — Reihenfolge hier mit ‹ › ändern.</span>'}</div>`;
+  }
+
+  function saveQueue(){
+    updateDoc(doc(db, "artefakte", ARTEFAKT_ID), { nextUp }).catch(() => {});
+  }
+  function moveInQueue(id, dir){
+    const i = nextUp.indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= nextUp.length) return;
+    [nextUp[i], nextUp[j]] = [nextUp[j], nextUp[i]];
+    renderPipeline(); saveQueue();
+  }
+  function toggleQueue(id){
+    nextUp = nextUp.includes(id) ? nextUp.filter(x => x !== id) : [...nextUp, id];
+    renderPipeline(); renderModal(); saveQueue();
   }
 
   function renderShelves(){
-    renderReadingFocus();
+    renderPipeline();
     const filtered = orderedForWall(books.filter(matches));
     const shelvesEl = document.getElementById("shelves");
     if (!filtered.length){ shelvesEl.innerHTML = `<div class="empty-note">Kein Buch gefunden.</div>`; return; }
@@ -565,6 +591,9 @@
               <button class="fav-btn ${b.favorite ? "active" : ""}" data-toggle-fav="1">
                 ${b.favorite ? "★ Favorit" : "☆ Als Favorit markieren"}
               </button>
+              ${b.status === "unread" || b.status === "tobuy" || nextUp.includes(b.id) ? `<button class="queue-btn ${nextUp.includes(b.id) ? "active" : ""}" data-toggle-queue="1">
+                ${nextUp.includes(b.id) ? `✓ Auf der Leseliste (Platz ${nextUp.indexOf(b.id) + 1})` : "+ Auf die Leseliste"}
+              </button>` : ""}
               <label class="kauf-field">Gekauft am
                 <input type="date" id="kaufdatum-input" value="${kaufdatumToIso(b.kaufdatum)}">
               </label>
@@ -584,7 +613,10 @@
     const b = findBook(id);
     if (!b) return;
     b.status = status;
-    renderShelves(); renderModal();
+    if ((status === "reading" || status === "read") && nextUp.includes(id)){
+      nextUp = nextUp.filter(x => x !== id); saveQueue();
+    }
+    updateFilterChipsUI(); renderShelves(); renderModal();
     saveBook(b);
   }
 
@@ -605,7 +637,7 @@
     } else {
       delete b.kaufdatum;
     }
-    renderShelves(); renderModal();
+    updateFilterChipsUI(); renderShelves(); renderModal();
     saveBook(b);
   }
 
@@ -613,7 +645,7 @@
     const b = findBook(id);
     if (!b) return;
     b.favorite = !b.favorite;
-    renderShelves(); renderModal();
+    updateFilterChipsUI(); renderShelves(); renderModal();
     saveBook(b);
   }
 
@@ -637,12 +669,19 @@
     if (card){ openBookId = card.dataset.open; renderModal(); }
   }
   document.getElementById("shelves").addEventListener("click", openOnClick);
-  document.getElementById("reading-focus").addEventListener("click", openOnClick);
+  document.getElementById("pipeline").addEventListener("click", e => {
+    const mv = e.target.closest("[data-move]");
+    if (mv){ moveInQueue(mv.dataset.id, +mv.dataset.move); return; }
+    const rm = e.target.closest("[data-remove]");
+    if (rm){ toggleQueue(rm.dataset.remove); return; }
+    openOnClick(e);
+  });
 
   document.getElementById("modalRoot").addEventListener("click", e => {
     const statusBtn = e.target.closest("[data-status]");
     if (statusBtn){ setStatus(openBookId, statusBtn.dataset.status); return; }
     if (e.target.closest("[data-toggle-fav]")){ toggleFavorite(openBookId); return; }
+    if (e.target.closest("[data-toggle-queue]")){ toggleQueue(openBookId); return; }
     if (e.target.closest("[data-close]") === e.target || e.target.dataset.close){ openBookId = null; renderModal(); }
   });
 
@@ -658,6 +697,7 @@
 
   function applySnapshotData(data){
     books = data.books || [];
+    nextUp = data.nextUp || [];
     computeShelfColors();
     updateFilterChipsUI();
     renderShelves();
